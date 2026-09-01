@@ -20,6 +20,7 @@ Verified on 2026-09-02, by running it, not by reading it:
 - `node apps/engine/dist/index.js` and the sandbox equivalent both execute
 - `ALTER_RUNTIME_MODE=prod` throws rather than defaulting to something permissive
 - `docker compose -f docker/compose.yml up -d` — Postgres 17.11 answered SQL, Redis round-tripped a key, Temporal reported `SERVING`
+- CI run [33555200917](https://github.com/havishalterx-eng/alterengine--5/actions/runs/33555200917) — `conclusion=success` on GitHub, 9 tests passing there, not only locally
 
 ---
 
@@ -45,7 +46,7 @@ Verified on 2026-09-02, by running it, not by reading it:
 |---|---|---|
 | Repository, TypeScript monorepo, module layout | CEO | REAL |
 | docker-compose: Postgres, Temporal, Redis | Integrator | REAL |
-| CI skeleton, all gates in warn-only | Integrator | REAL — unverified until first push |
+| CI skeleton, all gates in warn-only | Integrator | REAL |
 | Worktree setup, one per agent | Integrator | REAL |
 | Gate list defined and reviewed | Adversary | REAL — defined; Adversary review outstanding |
 | Process layout decision recorded | CEO | — |
