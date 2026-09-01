@@ -2,7 +2,7 @@
 
 Takes a business problem, decides what system should exist to solve it, builds and runs that system durably, verifies the real-world outcome, repairs failures at the smallest broken layer, and learns safely — without a human hand-designing the workflow.
 
-**Status: Phase 0.** Design complete, no components built yet.
+**Status: Phase 0 closed, Phase 1 not started.** Toolchain, dependency stack, CI and five architecture gates are up and verified by execution. No components built yet.
 
 ---
 
@@ -24,6 +24,8 @@ Then your role brief in [`docs/roles/`](docs/roles/), then [`docs/build/STATUS.m
 | [`docs/build/STATUS.md`](docs/build/STATUS.md) | **Single source of truth for progress** |
 | [`docs/build/DECISIONS.md`](docs/build/DECISIONS.md) | Append-only decision log |
 | [`docs/build/build-order.md`](docs/build/build-order.md) | Eight phases, waves, role assignments |
+| [`docs/build/AGENT-ROSTER.md`](docs/build/AGENT-ROSTER.md) | **The six launch briefs.** Who runs where, on what |
+| [`docs/build/LAUNCH-BRIEFS.md`](docs/build/LAUNCH-BRIEFS.md) | Opener, task format, echo check, worktrees |
 | [`docs/architecture/contracts.md`](docs/architecture/contracts.md) | All 55 component contracts |
 | [`docs/architecture/whole.md`](docs/architecture/whole.md) | The engine as one system |
 | [`docs/architecture/layers.md`](docs/architecture/layers.md) | L1–L8 composition |
