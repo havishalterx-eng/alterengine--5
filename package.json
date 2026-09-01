@@ -1,0 +1,28 @@
+{
+  "name": "alter-engine",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@11.17.0",
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "scripts": {
+    "build": "tsc --build",
+    "typecheck": "tsc --build --force",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "lint": "eslint .",
+    "gates": "node scripts/gates/run-all.mjs",
+    "stack:up": "docker compose -f docker/compose.yml up -d",
+    "stack:down": "docker compose -f docker/compose.yml down",
+    "stack:logs": "docker compose -f docker/compose.yml logs -f",
+    "stack:wait": "node scripts/wait-for-stack.mjs"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "eslint": "^9.17.0",
+    "typescript": "^5.7.2",
+    "typescript-eslint": "^8.18.1",
+    "vitest": "^2.1.8"
+  }
+}

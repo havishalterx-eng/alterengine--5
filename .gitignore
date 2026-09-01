@@ -1,5 +1,7 @@
 node_modules/
-/dist/
+dist/
+*.tsbuildinfo
+# Only the repository-root build output. NOT docs/build/, which is tracked.
 /build/
 .env
 .env.*

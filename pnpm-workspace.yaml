@@ -1,0 +1,7 @@
+packages:
+  - "packages/*"
+  - "apps/*"
+# esbuild ships a platform binary and needs its postinstall to run.
+# vitest cannot start without it.
+allowBuilds:
+  esbuild: true

@@ -1,0 +1,102 @@
+# Local dependency stack for real-execution verification.
+#
+# Ports are deliberately offset from the defaults. The previous build's stack
+# holds 5432-5434, 6379, 7233 and 8233 on this machine, and both stacks need to
+# run side by side during the rebuild.
+#
+#   Postgres        5440
+#   Redis           6390
+#   Temporal gRPC   7240
+#   Temporal UI     8240
+#
+# "Done" means a component ran against these. Not fixtures, not mocks.
+
+name: alter-engine
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: alter
+      POSTGRES_PASSWORD: alter_local_dev
+      POSTGRES_DB: alter
+      POSTGRES_INITDB_ARGS: "--data-checksums"
+    ports:
+      - "5440:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U alter -d alter"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--save", "60", "1", "--appendonly", "no"]
+    ports:
+      - "6390:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  # Temporal's own persistence. Kept separate from the application database so
+  # that resetting application data never corrupts workflow history, and so the
+  # no-cross-database-joins rule holds by construction rather than by discipline.
+  temporal-postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: temporal
+      POSTGRES_PASSWORD: temporal_local_dev
+      POSTGRES_DB: temporal
+    volumes:
+      - temporal-postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U temporal"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  temporal:
+    image: temporalio/auto-setup:1.26.2
+    restart: unless-stopped
+    depends_on:
+      temporal-postgres:
+        condition: service_healthy
+    environment:
+      DB: postgres12
+      DB_PORT: 5432
+      POSTGRES_USER: temporal
+      POSTGRES_PWD: temporal_local_dev
+      POSTGRES_SEEDS: temporal-postgres
+    ports:
+      - "7240:7233"
+    healthcheck:
+      test: ["CMD", "temporal", "operator", "cluster", "health", "--address", "temporal:7233"]
+      interval: 10s
+      timeout: 10s
+      retries: 30
+      start_period: 30s
+
+  temporal-ui:
+    image: temporalio/ui:2.32.0
+    restart: unless-stopped
+    depends_on:
+      - temporal
+    environment:
+      TEMPORAL_ADDRESS: temporal:7233
+      TEMPORAL_CORS_ORIGINS: http://localhost:8240
+    ports:
+      - "8240:8080"
+
+volumes:
+  postgres-data:
+  redis-data:
+  temporal-postgres-data:

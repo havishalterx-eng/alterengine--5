@@ -1,0 +1,76 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # Warn until the end of Phase 1, then flip to fail.
+  # See docs/build/DECISIONS.md — warn first reveals the true violation count
+  # before it blocks anyone.
+  GATE_MODE: warn
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: alter
+          POSTGRES_PASSWORD: alter_local_dev
+          POSTGRES_DB: alter
+        ports:
+          - 5440:5432
+        options: >-
+          --health-cmd "pg_isready -U alter -d alter"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6390:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.17.0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Typecheck
+        run: pnpm build
+
+      - name: Tests
+        run: pnpm test
+
+      - name: Architecture gates
+        run: pnpm gates
+
+      - name: Entry points actually run
+        # A component that compiles and has never executed is not built.
+        # This is the smallest possible version of that rule, applied to CI
+        # itself from day one.
+        run: |
+          node apps/engine/dist/index.js
+          node apps/sandbox/dist/index.js

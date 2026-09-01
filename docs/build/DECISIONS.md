@@ -67,3 +67,53 @@ Format: date · decision · reasoning · who decided.
 **Reasoning:** warn-only reveals the true violation count before it blocks anyone. Flipping to failing while the count is unknown stalls the team on day two.
 
 **Decided by:** Havish and Claude, jointly.
+
+---
+
+## 2026-09-02 — Build repository is `havishalterx-eng/alterengine--5`
+
+**Decision:** the build lives at `havishalterx-eng/alterengine--5`, public. An earlier push to `havishvardhan04-creator/alterengine--5` was abandoned and that repository is being deleted.
+
+**Reasoning:** Havish chose the `havishalterx-eng` account, which also owns `alter-x-4-`, keeping engine work under one identity. Claude flagged that the repository is public and that the architecture documents contain the competitive thesis, the pricing model, and named security defects of the previous build — some of which may relate to a still-deployed system. Havish decided public deliberately.
+
+**Decided by:** Havish.
+
+---
+
+## 2026-09-02 — Stack ports offset from the defaults
+
+**Decision:** Postgres 5440, Redis 6390, Temporal gRPC 7240, Temporal UI 8240.
+
+**Reasoning:** the previous build's stack holds 5432–5434, 6379, 7233 and 8233 on the build machine, and roughly ten of its dev servers are still running. Both stacks need to coexist during the rebuild. Defaults would have collided on first `docker compose up` and cost an hour of confusion.
+
+**Decided by:** Claude, recorded for reversal if the old stack is retired.
+
+---
+
+## 2026-09-02 — Temporal gets its own database
+
+**Decision:** Temporal persists to a separate Postgres instance, not the application database.
+
+**Reasoning:** resetting application data must never corrupt workflow history. It also makes rule 16 — no cross-database joins — hold by construction rather than by discipline. Nobody can accidentally join a workflow table to a tenant table if they are not in the same database.
+
+**Decided by:** Claude.
+
+---
+
+## 2026-09-02 — Two shared primitives land in Phase 0, not Phase 1
+
+**Decision:** `runtime-mode.ts` and `unimplemented.ts` ship in Phase 0, inside `@alter/contracts`.
+
+**Reasoning:** the mock-reachability gate cannot check anything without a mock gate to check for, and every component from Phase 1 onward needs the absence-visible protocol before it can honestly declare a capability unbuilt. Both are shared primitives, so rule 18 puts them in exactly one place. This is a deliberate small expansion of Phase 0 scope; anything beyond these two waits for its phase.
+
+**Decided by:** Claude.
+
+---
+
+## 2026-09-02 — Every gate must be proved to fire
+
+**Decision:** a gate is not accepted because it reports clean. It is accepted when a deliberate violation makes it fail, with the right file, line, and message.
+
+**Reasoning:** all five gates reported clean on an almost-empty repository, which proves nothing. A gate that has never fired is machinery with no driver — the exact pattern the gates exist to catch, reproduced in the gates themselves. Each of the five was verified against a fixture that violates it, and the fixture was then removed.
+
+**Decided by:** Claude.
