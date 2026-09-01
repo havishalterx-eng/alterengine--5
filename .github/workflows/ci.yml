@@ -72,5 +72,6 @@ jobs:
         # This is the smallest possible version of that rule, applied to CI
         # itself from day one.
         run: |
-          node apps/engine/dist/index.js
+          node apps/api/dist/index.js
+          node apps/worker/dist/index.js
           node apps/sandbox/dist/index.js

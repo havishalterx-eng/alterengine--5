@@ -2,7 +2,8 @@
   "files": [],
   "references": [
     { "path": "packages/contracts" },
-    { "path": "apps/engine" },
+    { "path": "apps/api" },
+    { "path": "apps/worker" },
     { "path": "apps/sandbox" }
   ]
 }

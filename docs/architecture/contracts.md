@@ -23,10 +23,93 @@ Every component gets these fields:
 | **FAIL MODE** | fail-closed (refuse safely) / fail-open (continue with default, must log loudly) |
 | **PLANE DEPS** | Which cross-cutting planes it touches |
 | **NON-RESPONSIBILITIES** | What this component must explicitly *not* do — the boundary it is forbidden to cross |
-| **PROCESS** | Which deployable this component runs in. **Unassigned until the process layout is decided — a gate before the first component is built.** |
+| **PROCESS** | Which deployable this component runs in. **Answered for all 55 in the process layout below — not repeated per contract.** |
 | **DONE GATE** | What proves this component actually works, tested against real execution |
 
-**Why PROCESS is a required field.** Blast radius is partly a function of co-location: two components sharing a process share a failure domain, so "degraded, self only" is only true if nothing critical sits beside it. Declaring blast radius without knowing the process layout makes that field unverifiable. The field is therefore present and deliberately unassigned; assigning it is a gate that must clear before any component is built.
+**Why PROCESS is a required field.** Blast radius is partly a function of co-location: two components sharing a process share a failure domain, so "degraded, self only" is only true if nothing critical sits beside it. Declaring blast radius without knowing the process layout makes that field unverifiable.
+
+---
+
+## Process layout
+
+**Decided 2026-09-02.** Answered once here rather than restated in 55 contracts. Writing one fact 55 times is pattern 4 — duplicated definitions drifting apart — applied to our own documentation, and it would drift the first time a component moved.
+
+Five homes. Three are TypeScript processes that exist in the repository today; two are not processes at all.
+
+| Home | What it is | Exists |
+|---|---|---|
+| `api` | HTTP request path. `apps/api` | yes |
+| `worker` | Run path and every background driver. `apps/worker` | yes |
+| `sandbox` | Isolated computation only. `apps/sandbox` | yes |
+| `library` | Linked into whichever process needs it. Not a deployable | n/a |
+| `browser` | Delivered to the user's browser. Not a server process | Phase 3 |
+| `pyworker` | Isolated Python worker, reached through the normal gateway pattern | Phase 6 |
+
+**Why `api` and `worker` split.** Temporal workers poll task queues and run arbitrarily long activities. Co-locating them with the HTTP server means one slow activity starves requests, and every "degraded, self only" blast radius on the request path becomes false. They also scale on different signals. This is not a preference — it is how Temporal is deployed, and rule 5 already commits us to the infrastructure-backed substrate.
+
+**Why `library` is a real answer.** The planes and the stores are not services. A plane attached as an in-process library runs inside whichever process calls it, which is what makes a plane call side-channel rather than a network hop. Forcing them to be processes would invent distributed failure modes we explicitly do not want, and would violate rule 16 by turning in-process reads into cross-service calls.
+
+### Assignment
+
+| # | Component | Process |
+|---:|---|---|
+| 1 | Identity & Tenant Gateway | `api` |
+| 2 | Event & Trigger Gateway | `api` ingress, `worker` dispatch |
+| 3 | Conversation Manager | `api` |
+| 4 | ADS Client | `library` |
+| 5 | ADS Store | `library` |
+| 6 | Problem Understanding | `api` |
+| 7 | Planner | `api` |
+| 8 | Clarification Loop | `api` attended, `worker` unattended |
+| 9 | Capability Resolver | `api` |
+| 10 | Architecture Synthesizer | `api` |
+| 11 | Capability Registry | `library` |
+| 12 | Selection & Binding | `api` and `worker` |
+| 13 | Agent Factory | `worker` |
+| 14 | Graph Compiler | `api` |
+| 15 | Workflow Lifecycle | `api` |
+| 16 | Run Manager | `api` starts, `worker` executes |
+| 17 | Durable Run Queue | `worker` |
+| 18 | Execution Workers | `worker` |
+| 19 | Durable Substrate | `library` over external Temporal |
+| 20 | Node Type Registry | `library` |
+| 21 | Executor | `worker` |
+| 22 | Blackboard | `library` |
+| 23 | Provisioning | `api` |
+| 24 | Side-Effect Ledger | `library` |
+| 25 | Approval Store | `library` |
+| 26 | Model Gateway | `library` |
+| 27 | Tool Gateway | `worker` |
+| 28 | Sandbox | `sandbox` |
+| 29 | Verification | `worker` |
+| 30 | Recovery Policy Engine | `worker` |
+| 31 | Synthesis | `worker` |
+| 32 | Memory & Learning | `worker`, embeddings on `pyworker` |
+| 33 | Policy Store | `library` |
+| 34 | Drift Detector | `pyworker`, triggered from `worker` |
+| 35 | Type/Schema Contracts | `library` — build-time generator |
+| 36 | Observability | `library` |
+| 37 | Safety & Policy | `library` |
+| 38 | Audit | `library` |
+| 39 | Cost Ledger | `library` |
+| 40 | Eval & Red-team | `worker` |
+| 41 | Cache / Reuse | `library` — deferred |
+| 42 | Identity & Membership | `api` |
+| 43 | Billing & Subscription | `api` — deferred |
+| 44 | Deletion & Retention | `api` requests, `worker` executes the saga |
+| 45 | Notification | `worker` |
+| 46 | Workspace & Workflow Management | `api` |
+| 47 | Connection & Credential Management | `api` |
+| 48 | Platform API / BFF | `api` |
+| 49 | Public Surface | `api` |
+| 50 | Chat & Workflow Builder | `browser` |
+| 51 | Canvas | `browser` |
+| 52 | Run Monitor | `browser` |
+| 53 | Approval Inbox | `browser` |
+| 54 | Account & Admin | `api` |
+| 55 | Outbox Relay | `worker` |
+
+**The split entries are the interesting ones.** Where a component names two homes, the boundary between them is real and must be built as one: 2, 8, 12, 16, 32 and 44 each have a request-path half and a background half. A builder who implements only the half in front of them produces a component that looks complete and has no driver — pattern 3, exactly. The contract's DRIVER field is what catches this, and for these six it must name the driver in the *other* process.
 
 **Status vocabulary — applied at build time, not now.** Once code exists, every component is marked **Real** (does what is specified) / **Partial** (built and wired, materially thinner) / **Hollow** (present, does almost none of its job). Anything with an interface is marked **twice** — once for whether the backend is real, once for whether the interface actually calls it. A single mark hides the most expensive failure: a working backend behind a fabricated screen. Nothing is marked today because nothing is built; marking a design would be theatre.
 
@@ -2189,7 +2272,7 @@ Anything executing as a Temporal activity is explicitly **not** in scope. Drawin
 
 **CALL TYPE** — async, continuous.
 
-**PROCESS** — unassigned.
+**PROCESS** — see the process layout table above.
 
 **DRIVER** — **a real relay process, polling for undelivered rows.** No caller drives this; it is a background loop by nature, and therefore exactly the shape that goes missing.
 *Driver test:* an event written with no other activity in the system is published without anything prompting it.

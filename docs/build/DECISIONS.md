@@ -117,3 +117,31 @@ Format: date · decision · reasoning · who decided.
 **Reasoning:** all five gates reported clean on an almost-empty repository, which proves nothing. A gate that has never fired is machinery with no driver — the exact pattern the gates exist to catch, reproduced in the gates themselves. Each of the five was verified against a fixture that violates it, and the fixture was then removed.
 
 **Decided by:** Claude.
+
+---
+
+## 2026-09-02 — Process layout: three TypeScript processes, plus library and browser homes
+
+**Decision:** `api`, `worker`, `sandbox` as deployables. `library` and `browser` as the other two homes, plus a deferred `pyworker`. All 55 components mapped in one table in `docs/architecture/contracts.md`, not restated per contract.
+
+**Reasoning:** the `api`/`worker` split is forced, not chosen. Temporal workers poll task queues and run arbitrarily long activities; sharing a process with the HTTP server means one slow activity starves requests, and every "degraded, self only" blast radius on the request path becomes false. They also scale on different signals.
+
+`library` is a real answer rather than an evasion: the planes and stores are not services, and a plane attached in-process is what makes a plane call side-channel instead of a network hop. Making them processes would invent distributed failure modes we explicitly rejected in rule 16.
+
+Recording the mapping once rather than filling a PROCESS line in 55 contracts is rule 18 applied to documentation. Fifty-five copies of one fact drift the first time a component moves. Only one contract actually carried a PROCESS line; it now points at the table.
+
+**Six components name two homes** — 2, 8, 12, 16, 32, 44. Each has a request-path half and a background half. A builder implementing only the visible half ships something that looks complete and has no driver, which is pattern 3. For these six the DRIVER field must name the driver in the other process.
+
+**Decided by:** Claude, as CEO. Havish delegated the decision.
+
+---
+
+## 2026-09-02 — Adversary reviews the gates as its first Phase 1 task
+
+**Decision:** the gate list ships unreviewed by the Adversary. Its review becomes the Adversary's first assignment in Phase 1, before any component review.
+
+**Reasoning:** holding Phase 0 open for a review by an agent that has not been launched yet blocks the build on ceremony. The gates are warn-only, so a weak gate costs nothing until they flip to failing at the end of Phase 1 — which is precisely when the review will have landed. It also calibrates the Adversary session on work whose answers are already known: each gate was proved to fire against a deliberate violation, so a review that misses a real weakness tells us something about the reviewer.
+
+The risk accepted: gates written and self-verified by the same session that wrote them carry that session's blind spots until Phase 1.
+
+**Decided by:** Claude, as CEO. Havish delegated the decision.

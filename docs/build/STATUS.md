@@ -17,7 +17,7 @@ Verified on 2026-09-02, by running it, not by reading it:
 - `pnpm build` — typechecks clean, TypeScript 5.9.3, strict plus `noUncheckedIndexedAccess` and `exactOptionalPropertyTypes`
 - `pnpm test` — 9 tests pass across 2 files
 - `pnpm gates` — all 5 gates run; each was proved to fire against a deliberate violation, then the fixture was removed
-- `node apps/engine/dist/index.js` and the sandbox equivalent both execute
+- `node apps/api/dist/index.js`, and the worker and sandbox equivalents, all execute
 - `ALTER_RUNTIME_MODE=prod` throws rather than defaulting to something permissive
 - `docker compose -f docker/compose.yml up -d` — Postgres 17.11 answered SQL, Redis round-tripped a key, Temporal reported `SERVING`
 - CI run [33555200917](https://github.com/havishalterx-eng/alterengine--5/actions/runs/33555200917) — `conclusion=success` on GitHub, 9 tests passing there, not only locally
@@ -48,13 +48,12 @@ Verified on 2026-09-02, by running it, not by reading it:
 | docker-compose: Postgres, Temporal, Redis | Integrator | REAL |
 | CI skeleton, all gates in warn-only | Integrator | REAL |
 | Worktree setup, one per agent | Integrator | REAL |
-| Gate list defined and reviewed | Adversary | REAL — defined; Adversary review outstanding |
-| Process layout decision recorded | CEO | — |
-| `PROCESS` field filled on all 55 contracts | CEO | — |
+| Gate list defined | Adversary | REAL — review deferred to Phase 1 by decision |
+| Process layout decided and all 55 mapped | CEO | REAL |
 
 **Exit gate:** `docker compose up` starts Postgres and Temporal · CI runs and reports warnings · every agent has an isolated worktree.
 
-Two of three exit conditions met locally. CI has never run — it is green in intent only until GitHub Actions executes it once.
+**All three met. Phase 0 is closed.** Phase 1 may start.
 
 ### Ports
 
@@ -77,6 +76,16 @@ Offset from the defaults on purpose: the previous build's stack holds 5432–543
 | `/private/tmp/wt-builder-c` | `agent/builder-c` |
 | `/private/tmp/wt-integrator` | detached |
 | `/private/tmp/wt-adversary` | detached |
+
+### Processes
+
+| Process | Home for | Path |
+|---|---|---|
+| `api` | HTTP request path, design path L1-L5, account/control | `apps/api` |
+| `worker` | Run path, background drivers, recovery, learning | `apps/worker` |
+| `sandbox` | Isolated computation only | `apps/sandbox` |
+
+`library` and `browser` are the two non-process homes; `pyworker` arrives in Phase 6. Full 55-component mapping is in `docs/architecture/contracts.md`.
 
 ### What exists in code
 
@@ -200,4 +209,4 @@ Record here as: component, who is blocked, on what, since when.
 
 ## Phase gates passed
 
-*None yet.*
+**Phase 0 — passed 2026-09-02.** Stack up and answering, CI green on GitHub (run 33555200917), six isolated worktrees, process layout decided and all 55 components mapped.
