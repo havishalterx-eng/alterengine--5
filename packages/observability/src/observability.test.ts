@@ -59,6 +59,17 @@ describe('36.1 — typed, versioned schema (done gate 1)', () => {
 });
 
 describe('36.2 — failing sink is fail-open and loud (done gate 3)', () => {
+  const record = {
+    schemaVersion: 1,
+    kind: 'event',
+    runId: 'r',
+    nodeId: 'n',
+    component: 'c',
+    tenantId: 't',
+    name: 'x',
+    payload: { ok: true },
+  };
+
   it('never throws into its caller, and logs loudly locally', () => {
     const loudLogs: unknown[] = [];
     const emit = createObserver({
@@ -71,22 +82,45 @@ describe('36.2 — failing sink is fail-open and loud (done gate 3)', () => {
       },
     }).emit;
 
-    const record = {
-      schemaVersion: 1,
-      kind: 'event',
-      runId: 'r',
-      nodeId: 'n',
-      component: 'c',
-      tenantId: 't',
-      name: 'x',
-      payload: { ok: true },
-    };
-
     // The whole point of fail-open: emit must not propagate the sink's throw.
     expect(() => emit(record)).not.toThrow();
     expect(loudLogs).toHaveLength(1);
     const entry = loudLogs[0] as { error: unknown; record: unknown };
     expect((entry.error as Error).message).toBe('sink on fire');
+  });
+
+  it('contains a sink that returns a rejected promise — no unhandled rejection', async () => {
+    const loudLogs: unknown[] = [];
+    const emit = createObserver({
+      sink: () => Promise.reject(new Error('async blowup')) as never,
+      redactor: passThroughRedactor,
+      onSinkError: (error) => {
+        loudLogs.push(error);
+      },
+    }).emit;
+
+    emit(record);
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    expect(loudLogs).toHaveLength(1);
+    expect((loudLogs[0] as Error).message).toBe('async blowup');
+  });
+
+  it('never sends an unredacted payload when the redactor itself fails', () => {
+    const seen: unknown[] = [];
+    const loudLogs: unknown[] = [];
+    const emit = createObserver({
+      sink: (rec) => seen.push(rec),
+      redactor: () => {
+        throw new Error('redactor down');
+      },
+      onSinkError: (error) => {
+        loudLogs.push(error);
+      },
+    }).emit;
+
+    expect(() => emit(record)).not.toThrow();
+    expect(seen, 'sink must never see an unredacted payload').toHaveLength(0);
+    expect(loudLogs).toHaveLength(1);
   });
 });
 

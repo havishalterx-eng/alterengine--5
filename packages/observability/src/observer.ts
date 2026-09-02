@@ -35,13 +35,24 @@ export function createObserver(options: ObserverOptions) {
     emit(record: unknown) {
       const validated = observabilityRecordSchema.parse(record);
 
-      const redacted: ObservabilityRecord = {
-        ...validated,
-        payload: redactor(validated.payload),
-      };
+      let redacted: ObservabilityRecord;
+      try {
+        redacted = { ...validated, payload: redactor(validated.payload) };
+      } catch (error) {
+        // Redaction failure is fail-CLOSED for the record: never send an
+        // unredacted payload to a sink. The run survives (fail-open), the
+        // record is dropped, and the failure is loud.
+        onSinkError(error, validated);
+        return;
+      }
 
       try {
-        options.sink(redacted);
+        const result = options.sink(redacted);
+        // A sink typed sync can still return a promise; an unhandled
+        // rejection would crash the process, which fail-open forbids.
+        if (result instanceof Promise) {
+          result.catch((error: unknown) => onSinkError(error, redacted));
+        }
       } catch (error) {
         onSinkError(error, redacted);
       }
