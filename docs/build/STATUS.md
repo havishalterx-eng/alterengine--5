@@ -199,6 +199,12 @@ Two shared primitives, both rule-enforcing, both tested. Nothing else.
 
 ---
 
+## Wave 2 is blocked on component 35
+
+Components 36, 37, 38, 39 and 44-registration cannot start until 35 (Type/Schema Contracts) is merged. 35 generates the types every one of them imports; anything begun before it lands gets rewritten.
+
+35 belongs to the CEO. Until it merges, builders run the execution check and review their own contracts for done-gate items that cannot be written as executable tests.
+
 ## Blocked
 
 *Nothing blocked.*

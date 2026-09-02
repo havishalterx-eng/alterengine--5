@@ -24,7 +24,8 @@ Then your role brief in [`docs/roles/`](docs/roles/), then [`docs/build/STATUS.m
 | [`docs/build/STATUS.md`](docs/build/STATUS.md) | **Single source of truth for progress** |
 | [`docs/build/DECISIONS.md`](docs/build/DECISIONS.md) | Append-only decision log |
 | [`docs/build/build-order.md`](docs/build/build-order.md) | Eight phases, waves, role assignments |
-| [`docs/build/AGENT-ROSTER.md`](docs/build/AGENT-ROSTER.md) | **The six launch briefs.** Who runs where, on what |
+| [`docs/build/SESSION-SETUP.md`](docs/build/SESSION-SETUP.md) | **Paste-ready session blocks.** Start here to launch |
+| [`docs/build/AGENT-ROSTER.md`](docs/build/AGENT-ROSTER.md) | Who runs where, on what model, and why |
 | [`docs/build/LAUNCH-BRIEFS.md`](docs/build/LAUNCH-BRIEFS.md) | Opener, task format, echo check, worktrees |
 | [`docs/architecture/contracts.md`](docs/architecture/contracts.md) | All 55 component contracts |
 | [`docs/architecture/whole.md`](docs/architecture/whole.md) | The engine as one system |
