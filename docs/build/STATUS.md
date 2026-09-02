@@ -4,7 +4,7 @@
 
 Updated by: the Builder on completion, the Integrator on merge, the CEO on assignment.
 
-Last updated: 2026-09-02 — Phase 0 scaffolding verified against real execution.
+Last updated: 2026-09-02 — Components 37 and 39 Phase-1 scope verified against real execution.
 
 ---
 
@@ -101,12 +101,12 @@ Two shared primitives, both rule-enforcing, both tested. Nothing else.
 ### Phase 1 — Planes
 | # | Component | Owner | State |
 |---:|---|---|---|
-| 35 | Type/Schema Contracts | CEO | **PARTIAL** — gates 1,5,6 real; 7 half-blocked, see below |
-| 36 | Observability | Builder B | WIP — agent/builder-b; Phase 1 halves built, see PHASE-1-SCOPE |
-| 37 | Safety & Policy | | — |
+| 35 | Type/Schema Contracts | CEO | **PARTIAL** — see the correction below. Thinner than first claimed |
+| 36 | Observability | | — |
+| 37 | Safety & Policy | Builder A | **PARTIAL** — Phase 1 SSRF guard, redaction primitive, and structural duplicate gate verified; Phase 2 injection classifier and Phase 4 egress enforcement remain mandatory revisits |
 | 38 | Audit | | — |
-| 39 | Cost Ledger | | — |
-| 44 | Deletion — registration mechanism | Builder B | WIP — agent/builder-b; Phase 1 halves built, see PHASE-1-SCOPE |
+| 39 | Cost Ledger | Builder A | **PARTIAL** — Phase 1 no-float gate, real-Postgres idempotency, and nullable verdict field verified; Phase 2 real-cost, real-verdict, and multi-node attribution revisits remain mandatory |
+| 44 | Deletion — registration mechanism | | — |
 
 ### Phase 2 — Walking skeleton
 | # | Component | Owner | State |
@@ -197,11 +197,11 @@ Two shared primitives, both rule-enforcing, both tested. Nothing else.
 | 10 | Architecture Synthesizer | Phase 3 — decides topology | Phase 6 — Policy Store informs patterns | — |
 | 12 | Selection & Binding | Phase 3 — scoring | Phase 6 — learned routing weights | — |
 | 35 | Type/Schema Contracts | Phase 1 — 501 + inventory halves of gate 7 | Phase 3 — disabled-state half, once a UI exists | — |
-| 36 | Observability | Phase 1 — schema, attribution, fail-open, redaction seam | Phase 2 — real-run complete trace with per-node cost/latency/decisions; Phase 5 — outage alerted via 45 | — |
 | 36 | Observability | Phase 1 — schema, attribution shape, fail-open outage | Phase 2 — real trace across a real run; Phase 5 — alerting via 45 | — |
 | 37 | Safety & Policy | Phase 1 — SSRF guard, redaction primitive, no-duplicate check | Phase 2 — injection classifier via 26; Phase 4 — PII on real egress paths | — |
 | 39 | Cost Ledger | Phase 1 — no-float, idempotency, verdict field present | Phase 2 — estimate vs real cost, verdicts against runs, multi-node attribution | — |
 | 38 | Audit | Phase 1 — full, four gates plus the scheduled verifier | Phase 7 — item 5b, account-deletion trigger | — |
+| 35 | Type/Schema Contracts | Phase 1 — registry, derivation, inventory, coverage gate | Phase 2 — generated server mounting, real HTTP 501, handler exhaustiveness | — |
 
 ---
 
@@ -216,6 +216,20 @@ Components 36, 37, 38, 39 and 44-registration cannot start until 35 (Type/Schema
 Contract reviews found that the planes' done gates were written to be verified against a running system that does not exist until Phase 2. Split into a provable-now half and a mandatory revisit — see [`PHASE-1-SCOPE.md`](PHASE-1-SCOPE.md).
 
 **A component whose Phase 1 half passes is PARTIAL, never REAL**, and a PARTIAL component cannot be cited as a finished dependency. An unticked revisit row blocks its phase gate.
+
+## Correction — component 35 was overclaimed
+
+The Adversary reviewed 35 after it merged and found three defects. All three stand.
+
+**What I claimed:** "a client method with no matching server operation is unrepresentable."
+
+**What is actually true:** a client method with no matching *registry operation* is unrepresentable. A client method with no *running server* is entirely representable — `createClient` takes any transport, `ServerOf` is a type nobody is forced to satisfy, and no HTTP server exists yet. Done-gate item 5 is satisfied as literally written, and the defect it exists to prevent — the previous build's 117 hand-written client methods calling routes nobody built — is **not** closed.
+
+**The 501 was client-local only.** An unimplemented operation throws before reaching the transport, which is useful, but a real `GET /workflows` reaches nothing at all. Item 7 asks for a real 501 response, meaning HTTP. That needs a server.
+
+**`assertInventoryCovers` had no production caller.** Real, tested, and decorative — machinery with no driver, in the component whose entire job is making absence visible. Fixed: the new `capability-coverage` gate discovers route mounts by AST and requires set equality with the registry, in both directions. Built before any route exists on purpose; added later it would have to grandfather whatever had already slipped through.
+
+**Revisit — Phase 2**, with component 48: a generated server owns all route mounting, the build fails unless every `implemented` operation has a handler, unimplemented entries mount a real 501 handler carrying the tracking reference, and the 501 is proved over HTTP rather than in a client unit test.
 
 ## Gate defects — all five evadeable
 
