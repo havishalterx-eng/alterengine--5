@@ -1,24 +1,80 @@
-import { finding, isTestFile, readLines, sourceFiles } from './lib.mjs';
+import { finding, isTestFile, sourceFiles } from './lib.mjs';
+import { lineOf, parse, ts, walk } from './ast.mjs';
 
 /**
  * Gate: one definition per shared primitive.
  *
  * Closes systemic pattern 4. The previous build had two ID validators with
- * different strictness — which one a boundary happened to import decided what
- * that boundary accepted. It also shipped two packages whose entire contents
- * were `export {}`, linted and built on every CI run.
+ * different strictness — one enforcing strict UUIDv7, another accepting any
+ * version 1 through 7 — and which one a boundary happened to import decided
+ * what that boundary accepted. It also shipped two packages whose entire
+ * contents were `export {}`, linted and built on every CI run.
  *
- * Rule 18: every shared primitive has exactly one definition.
+ * Rebuilt after the Adversary evaded the first version, which skipped every
+ * `index.ts` on the assumption that barrels only re-export. A barrel can hold
+ * a real declaration, and a duplicate hiding there is the worst case: it is
+ * the file every consumer imports from.
+ *
+ * Barrels are no longer skipped. Only AST-confirmed pure re-export statements
+ * are ignored.
  */
 
 export const name = 'duplicate-primitive';
 export const closes = 'Pattern 4 — duplicated primitives drifted apart';
 
-// Exported names that must be unique across the repository. Two definitions of
-// the same concept is the bug, regardless of which file wins an import.
-const TRACKED = /^export\s+(?:async\s+)?(?:function|class|const|type|interface)\s+(\w+)/;
-
 const ALLOW_DUPLICATES = new Set(['main', 'run', 'name', 'closes', 'default']);
+
+/** Declared names that are exported, excluding pure re-exports. */
+function declarationsIn(source) {
+  const declared = [];
+
+  walk(source, (node) => {
+    // `export { x } from './y'` and `export * from './y'` re-export without
+    // declaring. Everything else that carries a name is a declaration.
+    if (ts.isExportDeclaration(node)) return;
+
+    const isExported = node.modifiers?.some(
+      (modifier) => modifier.kind === ts.SyntaxKind.ExportKeyword,
+    );
+    if (!isExported) return;
+
+    if (
+      ts.isFunctionDeclaration(node) ||
+      ts.isClassDeclaration(node) ||
+      ts.isInterfaceDeclaration(node) ||
+      ts.isTypeAliasDeclaration(node) ||
+      ts.isEnumDeclaration(node)
+    ) {
+      if (node.name) declared.push({ symbol: node.name.text, node });
+      return;
+    }
+
+    if (ts.isVariableStatement(node)) {
+      for (const declaration of node.declarationList.declarations) {
+        if (ts.isIdentifier(declaration.name)) {
+          declared.push({ symbol: declaration.name.text, node: declaration });
+        }
+      }
+    }
+  });
+
+  return declared;
+}
+
+/** A barrel that re-exports nothing and declares nothing. */
+function isEmptyBarrel(source) {
+  const meaningful = source.statements.filter(
+    (statement) =>
+      !(
+        ts.isExportDeclaration(statement) &&
+        statement.exportClause &&
+        ts.isNamedExports(statement.exportClause) &&
+        statement.exportClause.elements.length === 0 &&
+        !statement.moduleSpecifier
+      ),
+  );
+  return meaningful.length === 0;
+}
 
 export async function run() {
   const findings = [];
@@ -27,46 +83,40 @@ export async function run() {
 
   for (const file of files) {
     if (isTestFile(file)) continue;
-    if (file.endsWith('index.ts')) continue; // barrels re-export by design
 
-    const lines = await readLines(file);
+    const { source } = await parse(file);
 
-    lines.forEach((text, index) => {
-      const match = TRACKED.exec(text.trim());
-      if (!match) return;
+    // Barrels are parsed like any other file now. A pure re-export declares
+    // nothing and produces no entries; a real declaration inside one does.
+    for (const { symbol, node } of declarationsIn(source)) {
+      if (ALLOW_DUPLICATES.has(symbol)) continue;
 
-      const symbol = match[1];
-      if (ALLOW_DUPLICATES.has(symbol)) return;
-
+      const line = lineOf(source, node);
       const existing = seen.get(symbol);
+
       if (existing) {
         findings.push(
           finding({
             file,
-            line: index + 1,
+            line,
             message:
               `"${symbol}" is also defined at ${existing.file}:${existing.line}. ` +
-              'Two definitions drift. Pick one home and import it.',
+              'Two definitions drift, and which one a boundary imports decides ' +
+              'what it accepts. Pick one home and import it.',
           }),
         );
-        return;
+        continue;
       }
 
-      seen.set(symbol, { file, line: index + 1 });
-    });
-  }
+      seen.set(symbol, { file, line });
+    }
 
-  // An empty package is the other half of this pattern: it builds, it lints,
-  // and it contains nothing.
-  for (const file of files) {
-    if (!file.endsWith('index.ts')) continue;
-    const body = (await readLines(file)).join('\n').trim();
-    if (body === 'export {}' || body === 'export {};' || body === '') {
+    if (isEmptyBarrel(source)) {
       findings.push(
         finding({
           file,
           line: 1,
-          message: 'Empty barrel. It builds and lints and contains nothing.',
+          message: 'Empty module. It builds and lints and contains nothing.',
         }),
       );
     }
