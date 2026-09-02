@@ -86,10 +86,36 @@ jobs:
         run: pnpm gates
 
       - name: Entry points actually run
-        # A component that compiles and has never executed is not built.
-        # This is the smallest possible version of that rule, applied to CI
-        # itself from day one.
+        # A component that compiles and has never executed is not built. This
+        # is the smallest possible version of that rule, applied to CI itself.
+        #
+        # The worker is long-running: it schedules the audit verifier and the
+        # retention sweeper, so it must NOT exit. The first version of this step
+        # ran each entry point and waited for it to finish, which hung the whole
+        # job for 20 minutes once component 38 landed. "Started and stayed up"
+        # is success for a worker; exiting would be the failure.
         run: |
-          node apps/api/dist/index.js
-          node apps/worker/dist/index.js
-          node apps/sandbox/dist/index.js
+          set -euo pipefail
+
+          run_short_lived() {
+            echo "checking $1 exits cleanly"
+            node "$1"
+          }
+
+          run_long_lived() {
+            echo "checking $1 starts and stays up"
+            set +e
+            timeout 10s node "$1"
+            code=$?
+            set -e
+            # 124 is timeout's exit code: still running when the clock ran out,
+            # which is exactly what a healthy worker should do.
+            if [ "$code" -ne 124 ]; then
+              echo "$1 exited with $code instead of staying up"
+              exit 1
+            fi
+          }
+
+          run_short_lived apps/api/dist/index.js
+          run_short_lived apps/sandbox/dist/index.js
+          run_long_lived apps/worker/dist/index.js
