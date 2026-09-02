@@ -28,6 +28,13 @@ export interface TenantDataExemption {
   readonly owner: string;
 }
 
-export const tenantDataDeclarations: readonly TenantDataDeclaration[] = [];
+export const tenantDataDeclarations: readonly TenantDataDeclaration[] = [
+  {
+    schema: 'public',
+    table: 'cost_ledger_entries',
+    component: 39,
+    owner: 'Builder A',
+  },
+];
 
 export const tenantDataExemptions: readonly TenantDataExemption[] = [];
