@@ -4,13 +4,15 @@
 
 Updated by: the Builder on completion, the Integrator on merge, the CEO on assignment.
 
-Last updated: 2026-09-02 — Components 37 and 39 Phase-1 scope verified against real execution.
+Last updated: 2026-09-03 — **Phase 1 closed.** All six components merged, gates flipped to failing.
 
 ---
 
 ## Current phase
 
-**Phase 0 — Foundation.** No components. Scaffolding only.
+**Phase 2 — Walking skeleton.** Not started.
+
+**Phase 1 closed 2026-09-03.** Six components merged, all PARTIAL. Ten architecture gates, `GATE_MODE=fail`. 92 tests against real Postgres, Redis and Temporal.
 
 Verified on 2026-09-02, by running it, not by reading it:
 
@@ -101,12 +103,12 @@ Two shared primitives, both rule-enforcing, both tested. Nothing else.
 ### Phase 1 — Planes
 | # | Component | Owner | State |
 |---:|---|---|---|
-| 35 | Type/Schema Contracts | CEO | **PARTIAL** — see the correction below. Thinner than first claimed |
-| 36 | Observability | | — |
-| 37 | Safety & Policy | Builder A | **PARTIAL** — Phase 1 SSRF guard, redaction primitive, and structural duplicate gate verified; Phase 2 injection classifier and Phase 4 egress enforcement remain mandatory revisits |
-| 38 | Audit | | — |
-| 39 | Cost Ledger | Builder A | **PARTIAL** — Phase 1 no-float gate, real-Postgres idempotency, and nullable verdict field verified; Phase 2 real-cost, real-verdict, and multi-node attribution revisits remain mandatory |
-| 44 | Deletion — registration mechanism | | — |
+| 35 | Type/Schema Contracts | CEO+builders | **PARTIAL** — merged |
+| 36 | Observability | CEO+builders | **PARTIAL** — merged |
+| 37 | Safety & Policy | CEO+builders | **PARTIAL** — merged |
+| 38 | Audit | CEO+builders | **PARTIAL** — merged |
+| 39 | Cost Ledger | CEO+builders | **PARTIAL** — merged |
+| 44 | Deletion — registration mechanism | Builder B | **PARTIAL** — merged |
 
 ### Phase 2 — Walking skeleton
 | # | Component | Owner | State |
@@ -250,5 +252,9 @@ Record here as: component, who is blocked, on what, since when.
 ---
 
 ## Phase gates passed
+
+**Phase 1 — passed 2026-09-03.** Six components merged as PARTIAL; ten gates flipped from warn to failing after measuring zero violations on main; 92 tests passing against real dependencies. Every Phase 2 revisit is recorded in the table above and blocks its own phase gate.
+
+
 
 **Phase 0 — passed 2026-09-02.** Stack up and answering, CI green on GitHub (run 33555200917), six isolated worktrees, process layout decided and all 55 components mapped.
