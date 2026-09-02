@@ -10,6 +10,7 @@
  * two. See docs/build/DECISIONS.md.
  */
 
+import * as capabilityCoverage from './capability-coverage.mjs';
 import * as deletionRegistration from './deletion-registration.mjs';
 import * as driverExistence from './driver-existence.mjs';
 import * as duplicatePrimitive from './duplicate-primitive.mjs';
@@ -22,6 +23,7 @@ const GATES = [
   driverExistence,
   duplicatePrimitive,
   deletionRegistration,
+  capabilityCoverage,
 ];
 
 const mode = process.env['GATE_MODE'] === 'fail' ? 'fail' : 'warn';
