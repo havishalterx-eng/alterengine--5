@@ -9,6 +9,7 @@
     "start": "node dist/index.js"
   },
   "dependencies": {
+    "@alter/audit": "workspace:*",
     "@alter/contracts": "workspace:*"
   }
 }
