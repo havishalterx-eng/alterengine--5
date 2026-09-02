@@ -41,6 +41,31 @@ export async function sourceFiles({ includeTests = true } = {}) {
   return found.sort();
 }
 
+/** Build and gate scripts. Real production drivers, written as .mjs. */
+export async function scriptFiles() {
+  const found = [];
+
+  async function walkScripts(dir) {
+    let entries;
+    try {
+      entries = await readdir(dir, { withFileTypes: true });
+    } catch {
+      return;
+    }
+    for (const entry of entries) {
+      const full = join(dir, entry.name);
+      if (entry.isDirectory()) {
+        await walkScripts(full);
+      } else if (entry.name.endsWith('.mjs')) {
+        found.push(relative(REPO_ROOT, full));
+      }
+    }
+  }
+
+  await walkScripts(join(REPO_ROOT, 'scripts'));
+  return found.sort();
+}
+
 export function isTestFile(path) {
   return (
     path.includes('.test.') ||

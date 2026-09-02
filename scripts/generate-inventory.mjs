@@ -9,9 +9,16 @@
 import { writeFile, readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { buildInventory } from '../packages/contracts/dist/inventory.js';
+import { assertNoDuplicateRoutes } from '../packages/contracts/dist/derive.js';
 import { registry } from '../packages/contracts/dist/registry.js';
 
 const OUTPUT = fileURLToPath(new URL('../capability-inventory.json', import.meta.url));
+
+// Two registry operations claiming the same method and path would let mount
+// order decide which one a request reaches. Checked here because this script
+// runs in CI on every push, so the check has a real driver rather than only a
+// test that calls it.
+assertNoDuplicateRoutes(registry);
 
 const inventory = buildInventory(registry);
 const serialised = `${JSON.stringify(inventory, null, 2)}\n`;

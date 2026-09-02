@@ -1,6 +1,7 @@
 import { finding, isTestFile, sourceFiles } from './lib.mjs';
 import { lineOf, parse, ts, walk } from './ast.mjs';
 import { registry } from '../../packages/contracts/dist/registry.js';
+import { buildInventory, assertInventoryCovers, InventoryCoverageError } from '../../packages/contracts/dist/inventory.js';
 
 /**
  * Gate: every capability served by production code is in the registry.
@@ -69,6 +70,7 @@ export async function run() {
   );
 
   const mounted = new Set();
+  const servedCapabilities = [];
 
   for (const file of files) {
     if (isTestFile(file)) continue;
@@ -78,6 +80,11 @@ export async function run() {
     for (const mount of routeMounts(source)) {
       const key = `${mount.method} ${mount.path}`;
       mounted.add(key);
+
+      const operation = Object.values(registry).find(
+        (candidate) => `${candidate.method} ${candidate.path}` === key,
+      );
+      if (operation) servedCapabilities.push(operation.capability);
 
       if (!known.has(key)) {
         findings.push(
@@ -119,6 +126,23 @@ export async function run() {
         );
       }
     }
+  }
+
+  // Use the real verifier rather than reimplementing its comparison here.
+  // A gate that duplicates the logic it is meant to enforce leaves the actual
+  // function with no production caller — which is the pattern this whole gate
+  // set exists to catch.
+  try {
+    assertInventoryCovers(buildInventory(registry), servedCapabilities);
+  } catch (error) {
+    if (!(error instanceof InventoryCoverageError)) throw error;
+    findings.push(
+      finding({
+        file: 'packages/contracts/src/registry.ts',
+        line: 1,
+        message: error.message,
+      }),
+    );
   }
 
   return findings;

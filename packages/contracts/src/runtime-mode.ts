@@ -67,6 +67,11 @@ export function isRuntimeMode(value: unknown): value is RuntimeMode {
  * deployment fails loudly at boot instead of running and dropping work.
  *
  * @param what identifies the mock in the error, so the failure names itself.
+ *
+ * @verifier-driver every-mock-implementation
+ * It has no production caller today because no mock exists yet. Every mock
+ * that is ever added must call it, and the mock-reachability gate fails any
+ * marked mock that does not.
  */
 export function assertMockAllowed(
   what: string,
