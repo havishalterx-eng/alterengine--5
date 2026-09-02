@@ -46,6 +46,28 @@ export function main(): void {
   console.log(`alter-worker starting in ${config.runtimeMode} mode`);
 
   const store = new AuditStore({ connectionString: config.databaseUrl });
+
+  // Apply the schema before anything schedules against it. Only tests called
+  // this before, so a fresh deployment's first verification tick failed on a
+  // missing table instead of verifying anything -- machinery whose driver
+  // existed but whose groundwork never ran.
+  void store
+    .ensureSchema()
+    .then(() => startSchedules(store))
+    .catch((error: unknown) => {
+       
+      console.error('alter-worker: could not apply the audit schema:', error);
+      process.exitCode = 1;
+    });
+}
+
+/**
+ * @driver startSchedules
+ * Called by main() once the audit schema is applied. Splitting this out of
+ * main() is what lets the schedules start only after ensureSchema() resolves,
+ * so the first verification tick has a table to verify.
+ */
+function startSchedules(store: AuditStore): void {
   const verifier = new AuditChainVerifier(store);
   const alerts = new AuditAlertSink(store.pool);
   const scheduler = new AuditVerifierScheduler(verifier, alerts);

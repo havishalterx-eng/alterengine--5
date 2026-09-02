@@ -27,7 +27,16 @@ export type VerificationIssueType =
   | 'hash-mismatch'
   | 'fork'
   | 'cycle'
-  | 'orphan';
+  | 'orphan'
+  /**
+   * Entries deleted from the END of the chain.
+   *
+   * Every hash link in what remains is still correct, so hash verification
+   * alone calls a truncated chain valid — delete the last entry of A -> B -> C
+   * and A -> B verifies perfectly. Detecting it needs an anchor outside the
+   * data, which is the sequence: it never rewinds when rows are deleted.
+   */
+  | 'truncation';
 
 export interface VerificationIssue {
   readonly type: VerificationIssueType;
@@ -150,14 +159,30 @@ export class AuditChainVerifier {
     };
     const PAGE = 1000;
     let offset = 0;
+    let lastSeq = 0;
     for (;;) {
       const page = await this.store.readPage(PAGE, offset);
       if (page.length === 0) break;
       for (const event of page) {
         checkEvent(event, state, issues);
+        lastSeq = event.seq;
       }
       offset += page.length;
     }
+
+    // The chain can be internally perfect and still be missing its tail.
+    const highestSeen = lastSeq;
+    const highestAllocated = await this.store.highestAllocatedSeq();
+    if (highestAllocated > highestSeen) {
+      issues.push({
+        type: 'truncation',
+        seq: highestSeen,
+        detail:
+          `chain ends at seq ${highestSeen} but ${highestAllocated} was allocated: ` +
+          `${highestAllocated - highestSeen} entry(ies) removed from the end`,
+      });
+    }
+
     return { valid: issues.length === 0, issues };
   }
 }

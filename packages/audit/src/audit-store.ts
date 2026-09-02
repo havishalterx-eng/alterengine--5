@@ -74,6 +74,29 @@ export class AuditStore {
     await this.pool.query(SCHEMA_SQL);
   }
 
+  /**
+   * The highest sequence value ever ALLOCATED, which is not the same as the
+   * highest row present.
+   *
+   * Deleting entries from the end of the chain leaves every remaining hash
+   * link intact, so hash verification alone reports a truncated chain as
+   * valid. The Postgres sequence never goes backwards when rows are deleted,
+   * so it is an anchor outside the data being verified — which is what makes
+   * truncation detectable at all.
+   */
+  async highestAllocatedSeq(): Promise<number> {
+    // pg_sequences reports last_value NULL until the sequence has been used,
+    // which is the empty-chain case and must read as 0 rather than as a gap.
+    const result = await this.pool.query<{ last_value: string | null }>(
+      `SELECT s.last_value
+       FROM pg_sequences s
+       WHERE format('%I.%I', s.schemaname, s.sequencename)
+             = pg_get_serial_sequence('audit_events', 'seq')`,
+    );
+    const value = result.rows[0]?.last_value;
+    return value === null || value === undefined ? 0 : Number(value);
+  }
+
   async close(): Promise<void> {
     await this.pool.end();
   }
