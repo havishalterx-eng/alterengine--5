@@ -12,6 +12,7 @@
  * because nothing holds tenant data yet — they grow as components land.
  */
 export interface TenantDataDeclaration {
+  readonly schema: string;
   readonly table: string;
   /** Component number owning the data, from docs/architecture/contracts.md. */
   readonly component: number;
@@ -20,6 +21,7 @@ export interface TenantDataDeclaration {
 }
 
 export interface TenantDataExemption {
+  readonly schema: string;
   readonly table: string;
   /** Required non-empty. A reason can be reviewed; silence cannot. */
   readonly reason: string;

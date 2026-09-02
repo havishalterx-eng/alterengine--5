@@ -1,5 +1,6 @@
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { existsSync } from 'node:fs';
 import { Client } from 'pg';
 import { beforeAll, afterAll, describe, expect, it } from 'vitest';
 import {
@@ -23,7 +24,9 @@ import {
 
 const dirname = path.dirname(fileURLToPath(import.meta.url));
 const envPath = path.join(dirname, '../../../.env');
-process.loadEnvFile(envPath);
+if (existsSync(envPath)) {
+  process.loadEnvFile(envPath);
+}
 
 const connectionString = process.env.DATABASE_URL;
 if (connectionString === undefined) {
@@ -43,9 +46,10 @@ afterAll(async () => {
 });
 
 describe('44 — declaration shape (done gate 1)', () => {
-  it('declarations name physical table names, each with component and owner', () => {
+  it('declarations name physical schema-qualified table names, each with component and owner', () => {
     for (const d of tenantDataDeclarations) {
-      expect(d.table, 'must be a physical table name').toMatch(/^[a-z_][a-z0-9_]*$/);
+      expect(d.schema).toMatch(/^[a-z_][a-z0-9_]*$/);
+      expect(d.table).toMatch(/^[a-z_][a-z0-9_]*$/);
       expect(typeof d.component).toBe('number');
       expect(d.owner.length).toBeGreaterThan(0);
     }
@@ -53,6 +57,8 @@ describe('44 — declaration shape (done gate 1)', () => {
 
   it('exemptions each carry a non-empty reason and a named owner, no wildcards', () => {
     for (const e of tenantDataExemptions) {
+      expect(e.schema).toMatch(/^[a-z_][a-z0-9_]*$/);
+      expect(e.table).toMatch(/^[a-z_][a-z0-9_]*$/);
       expect(e.reason.length, 'exemption must have a reason').toBeGreaterThan(0);
       expect(e.owner.length, 'exemption must have a named owner').toBeGreaterThan(0);
       expect(e.table).not.toContain('*');
@@ -61,33 +67,35 @@ describe('44 — declaration shape (done gate 1)', () => {
 });
 
 describe('44 — live-schema enumeration vs real Postgres (done gate 2)', () => {
+  const probeSchema = 'public';
   const probeTable = 'wt_b_gate44_probe';
+  const probeQualified = `${probeSchema}.${probeTable}`;
 
   it('sees a real table, flags it unregistered, and re-checks after drop', async () => {
     await client.query(`CREATE TABLE ${probeTable} (id serial PRIMARY KEY)`);
     let tables = await listLiveTables(client);
-    expect(tables).toContain(probeTable);
+    expect(tables).toContain(probeQualified);
 
-    const probeDecls = tenantDataDeclarations.filter((d) => d.table !== probeTable);
+    const probeDecls = tenantDataDeclarations.filter((d) => `${d.schema}.${d.table}` !== probeQualified);
     const first = certifySchemaCoverage(tables, probeDecls, tenantDataExemptions);
     expect(first.status).toBe('incomplete');
     if (first.status === 'incomplete') {
-      expect(first.unregistered).toContain(probeTable);
+      expect(first.unregistered).toContain(probeQualified);
     }
 
     await client.query(`DROP TABLE ${probeTable}`);
     tables = await listLiveTables(client);
-    expect(tables).not.toContain(probeTable);
+    expect(tables).not.toContain(probeQualified);
 
     // Drift in the other direction: a declaration for a table gone missing.
     const stale = certifySchemaCoverage(
       tables,
-      [...tenantDataDeclarations, { table: probeTable, component: 44, owner: 'Builder B' }],
+      [...tenantDataDeclarations, { schema: probeSchema, table: probeTable, component: 44, owner: 'Builder B' }],
       tenantDataExemptions,
     );
     expect(stale.status).toBe('incomplete');
     if (stale.status === 'incomplete') {
-      expect(stale.stale).toContain(probeTable);
+      expect(stale.stale).toContain(probeQualified);
     }
   });
 });
@@ -95,21 +103,21 @@ describe('44 — live-schema enumeration vs real Postgres (done gate 2)', () => 
 describe('44 — fail-closed semantics (done gate 3)', () => {
   it('missing declaration for a live table yields incomplete, never skipped', () => {
     const result = certifySchemaCoverage(
-      ['users'],
-      [{ table: 'audit_log', component: 38, owner: 'Builder C' }],
+      ['public.users'],
+      [{ schema: 'public', table: 'audit_log', component: 38, owner: 'Builder C' }],
       [],
     );
     expect(result.status).toBe('incomplete');
     if (result.status === 'incomplete') {
-      expect(result.unregistered).toEqual(['users']);
+      expect(result.unregistered).toEqual(['public.users']);
     }
   });
 
   it('exempted tables are explicitly out of scope, not silently skipped', () => {
     const result = certifySchemaCoverage(
-      ['users'],
+      ['public.users'],
       [],
-      [{ table: 'users', reason: 'no tenant data; system config only', owner: 'CEO' }],
+      [{ schema: 'public', table: 'users', reason: 'no tenant data; system config only', owner: 'CEO' }],
     );
     expect(result.status).toBe('complete');
   });

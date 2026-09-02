@@ -34,14 +34,28 @@ describe('36.1 — typed, versioned schema (done gate 1)', () => {
     ).toBe(false);
   });
 
-  it('rejects an unstructured string payload at the boundary', () => {
+  it('drops an unstructured string payload without throwing into the caller', () => {
+    // This previously asserted that emit() THROWS. The Adversary was right
+    // that throwing violates fail-open: a malformed log record must never
+    // break the run it is describing. The record is rejected at the boundary,
+    // never reaches the sink, and the failure is reported loudly instead.
+    const received: unknown[] = [];
+    const failures: unknown[] = [];
     const observer = createObserver({
-      sink: () => {},
+      sink: (record) => {
+        received.push(record);
+      },
       redactor: passThroughRedactor,
+      onSinkError: (error) => {
+        failures.push(error);
+      },
     });
+
     expect(() =>
       observer.emit({ ...base, payload: 'not-an-object' } as never),
-    ).toThrow();
+    ).not.toThrow();
+    expect(received).toHaveLength(0);
+    expect(failures).toHaveLength(1);
   });
 
   it('rejects a missing attribution field (shape, not values)', () => {
