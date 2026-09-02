@@ -1,0 +1,20 @@
+CREATE TABLE IF NOT EXISTS cost_ledger_entries (
+  id BIGSERIAL PRIMARY KEY,
+  idempotency_key TEXT NOT NULL UNIQUE,
+  tenant_id TEXT NOT NULL,
+  workflow_id TEXT NOT NULL,
+  run_id TEXT NOT NULL,
+  node_id TEXT NOT NULL,
+  provider TEXT NOT NULL,
+  model TEXT NOT NULL,
+  tool_name TEXT NOT NULL,
+  sandbox_compute_minor_units BIGINT NOT NULL,
+  storage_minor_units BIGINT NOT NULL,
+  retry_attempt BIGINT NOT NULL,
+  recovery_attempt BIGINT NOT NULL,
+  internal_cost_minor_units BIGINT NOT NULL,
+  billable_cost_minor_units BIGINT NOT NULL,
+  margin_minor_units BIGINT NOT NULL,
+  verification_verdict TEXT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);

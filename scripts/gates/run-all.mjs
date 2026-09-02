@@ -12,9 +12,12 @@
 
 import * as capabilityCoverage from './capability-coverage.mjs';
 import * as deletionRegistration from './deletion-registration.mjs';
+import * as deletionSchema from './deletion-schema.mjs';
+import * as costNoFloat from './cost-no-float.mjs';
 import * as driverExistence from './driver-existence.mjs';
 import * as duplicatePrimitive from './duplicate-primitive.mjs';
 import * as mockReachability from './mock-reachability.mjs';
+import * as safetyDuplicate from './safety-duplicate.mjs';
 import * as unsafeDefault from './unsafe-default.mjs';
 import * as verifierDriver from './verifier-driver.mjs';
 
@@ -23,9 +26,12 @@ const GATES = [
   unsafeDefault,
   driverExistence,
   duplicatePrimitive,
+  safetyDuplicate,
+  costNoFloat,
   deletionRegistration,
   capabilityCoverage,
   verifierDriver,
+  deletionSchema,
 ];
 
 const mode = process.env['GATE_MODE'] === 'fail' ? 'fail' : 'warn';

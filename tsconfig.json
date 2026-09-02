@@ -4,6 +4,8 @@
     { "path": "packages/contracts" },
     { "path": "packages/observability" },
     { "path": "packages/deletion-registry" },
+    { "path": "packages/safety" },
+    { "path": "packages/cost-ledger" },
     { "path": "apps/api" },
     { "path": "apps/worker" },
     { "path": "apps/sandbox" }
