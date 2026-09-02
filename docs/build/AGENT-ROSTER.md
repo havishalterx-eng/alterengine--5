@@ -15,22 +15,57 @@ An **agent is a session in a coding IDE**, not a process and not a person. Four 
 | — | CEO / Contract Keeper | Claude Code | Opus 5 | `/private/tmp/alterengine-5` | `main` |
 | A1 | **Adversary** | Codex | 5.6 Terra | `/private/tmp/wt-adversary` | detached |
 | A2 | **Builder A** | Codex | 5.6 Terra | `/private/tmp/wt-builder-a` | `agent/builder-a` |
-| A3 | Builder B | opencode | GLM 5.2 | `/private/tmp/wt-builder-b` | `agent/builder-b` |
-| A4 | Integrator | opencode | GLM 5.2 | `/private/tmp/wt-integrator` | detached |
-| A5 | Builder C | Abacus AI code | GLM 5.2 | `/private/tmp/wt-builder-c` | `agent/builder-c` |
-| A6 | Floater | Abacus AI code | GLM 5.2 | assigned on activation | — |
+| A3 | Builder B | opencode | **GLM-5.3** | `/private/tmp/wt-builder-b` | `agent/builder-b` |
+| A4 | Integrator | opencode | **Qwen3.8 Max** | `/private/tmp/wt-integrator` | detached |
+| A5 | Builder C | Abacus AI code | **Kimi K3** | `/private/tmp/wt-builder-c` | `agent/builder-c` |
+| A6 | Floater | Abacus AI code | **ZAI GLM 5.3** | assigned on activation | — |
+
+**One model per session, fixed.** Pinned to the role, not switched per task, so behaviour stays comparable across the build and a bad result points at something.
+
+### Model choice, and the evidence for it
+
+**GLM 5.2 is not used anywhere.** It was the original plan for all four non-Codex sessions and it is the single worst option available, because the thing it is weakest at is the thing these agents do all day. On Terminal-Bench 3.0 it scores **4.6**; GLM-5.3, sitting next to it in both model lists, scores **28.3**. On SWE-Marathon it goes 19.4 to 42.5, and on DeepSWE 46.2 to 66.9. GLM-5.3 also reaches a higher score using roughly 75k output tokens per task against 5.2's 96k, so it is cheaper per unit of work as well.
+
+| Model | Terminal-Bench 2.1 | SWE-Bench Pro | Notes |
+|---|---:|---:|---|
+| Kimi K3 | 88.3 | — | Leads 8 of 11 shared benchmarks. 1.05M context |
+| GLM-5.3 | 88.2 | — | Agentic post-training; huge jump over 5.2. 1M context |
+| DeepSeek V4 Pro | 87.9 | 55.4 | Best at algorithmic work; ~2.2x cheaper |
+| Qwen3.8 Max | 86.6 | **67.7** | **#2 of 43 on instruction following** (93.9/100). 1M context |
+
+Terminal-Bench 2.1 and 3.0 are different, harder benchmarks — the 4.6 and 28.3 figures above are 3.0 and do not belong in this table's column.
+
+**Integrator gets Qwen3.8 Max** because the role is not creative. Its entire value is refusing to merge until six specific things are true, and instruction-following is the metric that measures exactly that. Highest SWE-Bench Pro of the four is a bonus for judging whether a done gate really passed.
+
+**Builder B gets GLM-5.3** — strongest remaining agentic-coding profile in opencode, and the long-horizon post-training is aimed at precisely the multi-step build-test-fix loop a Builder runs.
+
+**Builder C gets Kimi K3** — the strongest model available in Abacus, given to component 38, which is the most discipline-sensitive build in Phase 1.
+
+**Floater gets GLM 5.3** — second-strongest in Abacus, and it activates against the moat boundary test in Phase 3, where reading a 165KB contracts document matters as much as writing code.
+
+**Model diversity is now a real property, not an accident.** Five distinct models across seven sessions. The Adversary shares a model with exactly one builder instead of four, so a systematic blind spot no longer covers most of the codebase.
+
+### Cost traps in the opencode list
+
+`Hy3` is marked **8x usage** and `GLM-5.3-Flash` is marked **2x usage** — the Flash variant costs more than the full model, which is worth confirming before anyone picks it by reflex. None of the four chosen models carries a multiplier.
+
+### How much to trust this
+
+These are vendor and aggregator numbers. GLM-5.3's own coverage notes that independent verification is still pending, and no benchmark measures this codebase. The ranking is a starting position, not a finding.
+
+The evidence that will actually matter arrives at the end of Phase 1: rework rate per builder, findings-per-review for the Adversary, and how often a session claims done on something that fails the Integrator's real-execution check. Re-pick then, against that.
+
+**The model lists in both IDEs scroll beyond what was captured.** If a Claude or Gemini frontier model is available in either, say so — it changes the Adversary and Builder A analysis, which currently assumes Codex is the only non-open-weights option.
 
 ### Why these assignments
 
-**Four of six sessions run GLM 5.2.** Same model in two different harnesses (opencode, Abacus), so the differences between those four are harness differences, not model differences. Only the two Codex sessions run a different model.
-
-That single fact drives the layout. **The reviewer must not be the same model as the reviewed**, or the Adversary shares the exact blind spots of the code it is checking and the review becomes an expensive echo. So the Adversary is Codex/Terra, reviewing work that is mostly GLM-written.
+**The reviewer must not be the same model as the reviewed**, or the Adversary shares the exact blind spots of the code it is checking and the review becomes an expensive echo. With one model pinned per session, the Adversary on GPT-5.6 Terra now overlaps with exactly one builder rather than four.
 
 The second Codex session goes to **Builder A**, which carries component 37 — Safety & Policy. That is the highest-consequence build in Phase 1: it holds the SSRF guard, the injection classifier and redaction. A defect there is a security vulnerability, not a bug.
 
 Integrator is deliberately **not** Codex — see the sandbox risk below.
 
-I have no first-hand measurement of 5.6 Terra against GLM 5.2 on this codebase. This layout is reasoned from role leverage, not from benchmark. **Revisit at the end of Phase 1 with evidence** — findings-per-review for the Adversary, rework rate for the builders.
+No benchmark measures this codebase. The layout is reasoned from role leverage plus published agentic-coding results. **Revisit at the end of Phase 1 with evidence** — findings-per-review for the Adversary, rework rate for the builders, and how often a session claims done on something that fails the Integrator's real-execution check.
 
 ### The single-Adversary risk
 
@@ -89,7 +124,7 @@ The CEO verifies that echo before work starts. A wrong or missing echo means the
 
 ---
 
-## A2 — Builder A · Codex · 5.6 Terra
+## A2 — Builder A · Codex · GPT-5.6 Terra
 
 ```
 Repository: https://github.com/havishalterx-eng/alterengine--5
@@ -143,7 +178,7 @@ PHASE 1 ASSIGNMENT — hold until the CEO issues it.
 
 ---
 
-## A3 — Builder B · opencode · GLM 5.2
+## A3 — Builder B · opencode · GLM-5.3
 
 ```
 Repository: https://github.com/havishalterx-eng/alterengine--5
@@ -186,7 +221,7 @@ PHASE 1 ASSIGNMENT — hold until the CEO issues it.
 
 ---
 
-## A5 — Builder C · Abacus AI code · GLM 5.2
+## A5 — Builder C · Abacus AI code · Kimi K3
 
 ```
 Repository: https://github.com/havishalterx-eng/alterengine--5
@@ -237,7 +272,7 @@ PHASE 1 ASSIGNMENT — hold until the CEO issues it.
 
 ---
 
-## A4 — Integrator · opencode · GLM 5.2
+## A4 — Integrator · opencode · Qwen3.8 Max
 
 ```
 Repository: https://github.com/havishalterx-eng/alterengine--5
@@ -286,7 +321,7 @@ PHASE 1 ASSIGNMENT — hold until the CEO issues it.
 
 ---
 
-## A1 — Adversary · Codex · 5.6 Terra
+## A1 — Adversary · Codex · GPT-5.6 Terra
 
 ```
 Repository: https://github.com/havishalterx-eng/alterengine--5
@@ -359,7 +394,7 @@ FIRST TASK — this one comes BEFORE any component review.
 
 ---
 
-## A6 — Floater · Abacus AI code · GLM 5.2
+## A6 — Floater · Abacus AI code · ZAI GLM 5.3
 
 ```
 DO NOT LAUNCH YET.
@@ -403,10 +438,10 @@ Its first assignment, when it launches, is already known:
 | Component | Agent | IDE / model |
 |---|---|---|
 | 35 Type/Schema Contracts | CEO | Claude Code / Opus 5 |
-| 37 Safety & Policy | Builder A | Codex / 5.6 Terra |
-| 39 Cost Ledger | Builder A | Codex / 5.6 Terra |
-| 36 Observability | Builder B | opencode / GLM 5.2 |
-| 44 registration interface | Builder B | opencode / GLM 5.2 |
-| 38 Audit | Builder C | Abacus / GLM 5.2 |
-| 44 CI gate | Integrator | opencode / GLM 5.2 |
-| Gate review | Adversary | Codex / 5.6 Terra |
+| 37 Safety & Policy | Builder A | Codex / GPT-5.6 Terra |
+| 39 Cost Ledger | Builder A | Codex / GPT-5.6 Terra |
+| 36 Observability | Builder B | opencode / GLM-5.3 |
+| 44 registration interface | Builder B | opencode / GLM-5.3 |
+| 38 Audit | Builder C | Abacus / Kimi K3 |
+| 44 CI gate | Integrator | opencode / Qwen3.8 Max |
+| Gate review | Adversary | Codex / GPT-5.6 Terra |

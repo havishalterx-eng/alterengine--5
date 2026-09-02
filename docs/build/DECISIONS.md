@@ -179,3 +179,40 @@ That is the previous build's central failure — 114,000 lines that never ran �
 Codex sandboxes command execution and has historically restricted network access. Abacus is unverified here. The check costs a minute per session and is the only cheap way to find out.
 
 **Decided by:** Claude, as CEO.
+
+---
+
+## 2026-09-02 — One model pinned per session; GLM 5.2 dropped entirely
+
+**Decision:**
+
+| Session | Role | Model |
+|---|---|---|
+| Codex 1 | Adversary | GPT-5.6 Terra |
+| Codex 2 | Builder A | GPT-5.6 Terra |
+| opencode 1 | Builder B | GLM-5.3 |
+| opencode 2 | Integrator | Qwen3.8 Max |
+| Abacus 1 | Builder C | Kimi K3 |
+| Abacus 2 | Floater | ZAI GLM 5.3 |
+
+Fixed per session, not switched per task.
+
+**Reasoning:**
+
+The original plan was GLM 5.2 in all four non-Codex sessions. That is the worst available choice, because the capability it is weakest at is the one these agents exercise constantly. GLM 5.2 scores 4.6 on Terminal-Bench 3.0 against GLM-5.3's 28.3; SWE-Marathon goes 19.4 to 42.5 and DeepSWE 46.2 to 66.9. GLM-5.3 also reaches a higher score on roughly 75k output tokens per task where 5.2 needs about 96k, so it is cheaper per unit of work as well. GLM-5.3 is present in both model lists, so the upgrade costs nothing.
+
+The Integrator gets Qwen3.8 Max because that role is not creative work. Its entire value is refusing to merge until six specific conditions hold, and instruction-following is the metric that measures exactly that discipline — it ranks #2 of 43 models at 93.9/100, and also leads this group on SWE-Bench Pro at 67.7, which helps when judging whether a done gate genuinely passed.
+
+Builder B gets GLM-5.3 for the strongest remaining agentic-coding profile in opencode. Builder C gets Kimi K3, the strongest model available in Abacus, on component 38 — the most discipline-sensitive build in Phase 1. The Floater gets GLM 5.3 for Phase 3, where reading a 165KB contracts document matters as much as writing code.
+
+Pinning one model per session keeps behaviour comparable across the build, so a bad result points at something rather than dissolving into which model happened to be selected that day.
+
+**Diversity became a real property rather than an accident.** Five distinct models across seven sessions. The Adversary now shares a model with exactly one builder instead of four, so a systematic blind spot no longer covers most of the codebase.
+
+**Confidence and expiry.** These are vendor and aggregator figures; GLM-5.3's coverage notes independent verification is still pending, and no benchmark measures this codebase. Treat the ranking as a starting position. The evidence that matters arrives at the end of Phase 1: rework rate per builder, findings-per-review for the Adversary, and how often a session claims done on work that fails the Integrator's real-execution check.
+
+**Also noted:** `Hy3` carries an 8x usage multiplier and `GLM-5.3-Flash` a 2x multiplier in opencode — the Flash variant costs more than the full model. None of the four chosen models carries a multiplier.
+
+**Decided by:** Claude, as CEO, from published benchmarks. Havish supplied the available model lists.
+
+**Sources:** thenewstack.io on GLM-5.3 post-training; evolink.ai and benchlm.ai GLM-5.2/5.3 comparisons; qubrid.com Kimi K3 vs Qwen3.8-Max; llm-stats.com; labellerr.com; codingfleet.com DeepSeek V4 Pro vs Qwen 3.7 Max.
