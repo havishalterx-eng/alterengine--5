@@ -8,7 +8,7 @@
  * Phase 5 concern.
  */
 
-import { Pool } from 'pg';
+import type { Pool } from 'pg';
 
 export interface AuditAlert {
   readonly id: number;

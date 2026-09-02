@@ -7,21 +7,19 @@
  * tests. No fixtures, no mocks.
  */
 
-import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
-import { Pool } from 'pg';
+import type { Pool } from 'pg';
+import { loadConfig } from '@alter/contracts';
 import { AuditAlertSink, AuditChainVerifier, AuditStore, SCHEMA_SQL } from './index.js';
 
-/** The builder's own database, from .env or the environment. */
+/**
+ * The builder's own database.
+ *
+ * Goes through loadConfig rather than reading process.env directly, so tests
+ * fail the same way production does when configuration is missing -- and so
+ * the unsafe-default gate has exactly one module to police.
+ */
 export function databaseUrl(): string {
-  if (process.env.DATABASE_URL) return process.env.DATABASE_URL;
-  const envPath = join(process.cwd(), '.env');
-  const text = readFileSync(envPath, 'utf8');
-  const match = text.match(/^DATABASE_URL=(.+)$/m);
-  if (!match) {
-    throw new Error('DATABASE_URL is not set and not present in .env');
-  }
-  return match[1]!.trim();
+  return loadConfig().databaseUrl;
 }
 
 export interface AuditHarness {

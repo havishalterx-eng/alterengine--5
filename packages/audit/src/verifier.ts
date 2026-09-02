@@ -19,7 +19,8 @@
  * from a tampered backup).
  */
 
-import { AuditStore, type AuditEvent } from './audit-store.js';
+import type { AuditStore} from './audit-store.js';
+import { type AuditEvent } from './audit-store.js';
 import { computeEntryHash, GENESIS_HASH, toHex } from './hash.js';
 
 export type VerificationIssueType =
@@ -40,6 +41,23 @@ export interface VerificationResult {
 }
 
 /** Verifies a chain of events in sequence order. Fail-closed. */
+/**
+ * @verifier-driver AuditChainVerifier.verify
+ *
+ * The batch form. Production uses the incremental form — AuditChainVerifier
+ * pages the chain so it never loads whole into memory — and both share
+ * `checkEvent`, which is where every tamper check actually lives.
+ *
+ * This form exists because two of the four tamper modes, a forked chain and a
+ * cycle, are physically un-insertable through the real store: the unique
+ * constraint on the previous hash forbids them. They are proved by feeding
+ * tampered event lists to this function directly. Hash mismatch and orphan
+ * are proved against the real database.
+ *
+ * So it is genuinely not called from production, and that is the design
+ * rather than an oversight. It is marked instead of deleted because deleting
+ * it would remove the only way to test the two modes the database prevents.
+ */
 export function verifyEvents(events: readonly AuditEvent[]): VerificationResult {
   const issues: VerificationIssue[] = [];
   const state: ChainState = {

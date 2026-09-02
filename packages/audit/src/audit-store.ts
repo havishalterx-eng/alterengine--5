@@ -1,3 +1,8 @@
+// TODO(component-44): add 'public.audit_events' to tenantDataDeclarations
+// once Builder B's packages/deletion-registry lands on main. It holds tenant
+// rows, so erasure must reach it. The deletion-registration gate flags it
+// until then and that flag is correct — this records the obligation rather
+// than pretending it is satisfied.
 /**
  * Component 38 — Audit. The append-only, tamper-evident audit store.
  *

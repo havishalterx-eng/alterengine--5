@@ -1,6 +1,7 @@
-import {
+import type {
   AuditAlertSink,
-  AuditChainVerifier,
+  AuditChainVerifier} from '@alter/audit';
+import {
   type VerificationResult,
 } from '@alter/audit';
 

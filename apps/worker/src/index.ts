@@ -1,11 +1,9 @@
-import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
 import {
   AuditAlertSink,
   AuditChainVerifier,
   AuditStore,
 } from '@alter/audit';
-import { resolveRuntimeMode } from '@alter/contracts';
+import { loadConfig } from '@alter/contracts';
 import { AuditRetentionSweeper } from './drivers/audit-retention-sweeper.js';
 import { AuditVerifierScheduler } from './drivers/audit-verifier-scheduler.js';
 
@@ -30,22 +28,24 @@ import { AuditVerifierScheduler } from './drivers/audit-verifier-scheduler.js';
 const VERIFY_INTERVAL_MS = 60_000;
 const SWEEP_INTERVAL_MS = 60_000;
 
-function databaseUrl(): string {
-  if (process.env.DATABASE_URL) return process.env.DATABASE_URL;
-  const text = readFileSync(join(process.cwd(), '.env'), 'utf8');
-  const match = text.match(/^DATABASE_URL=(.+)$/m);
-  if (!match) {
-    throw new Error('DATABASE_URL is not set and not present in .env');
-  }
-  return match[1]!.trim();
-}
-
+/**
+ * @driver main
+ * Called at the bottom of this file, so the process itself starts it. The tag
+ * must name the actual identifier — the gate looks for a call to it, and an
+ * invented name like 'alter-worker-main' matches nothing. The audit verifier and the
+ * retention sweeper are scheduled here, so the schedules have a process they
+ * demonstrably run in rather than being assumed to exist somewhere.
+ */
 export function main(): void {
-  const mode = resolveRuntimeMode();
+  // Configuration comes from the one module allowed to read the environment.
+  // Reading process.env here directly is what the unsafe-default gate forbids,
+  // and the .env fallback this replaced would have silently disagreed with
+  // whatever the rest of the process was configured with.
+  const config = loadConfig();
   // eslint-disable-next-line no-console
-  console.log(`alter-worker starting in ${mode} mode`);
+  console.log(`alter-worker starting in ${config.runtimeMode} mode`);
 
-  const store = new AuditStore({ connectionString: databaseUrl() });
+  const store = new AuditStore({ connectionString: config.databaseUrl });
   const verifier = new AuditChainVerifier(store);
   const alerts = new AuditAlertSink(store.pool);
   const scheduler = new AuditVerifierScheduler(verifier, alerts);
@@ -57,7 +57,7 @@ export function main(): void {
     scheduler
       .tick()
       .catch((error) => {
-        // eslint-disable-next-line no-console
+         
         console.error('audit verification failed to run:', error);
       });
   }, VERIFY_INTERVAL_MS);
@@ -66,7 +66,7 @@ export function main(): void {
     sweeper
       .tick()
       .catch((error) => {
-        // eslint-disable-next-line no-console
+         
         console.error('audit retention sweep failed to run:', error);
       });
   }, SWEEP_INTERVAL_MS);

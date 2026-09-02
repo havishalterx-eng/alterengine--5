@@ -12,7 +12,7 @@
  * destruction half is provable now.
  */
 
-import { AuditStore } from '@alter/audit';
+import type { AuditStore } from '@alter/audit';
 
 export class AuditRetentionSweeper {
   constructor(private readonly store: AuditStore) {}
