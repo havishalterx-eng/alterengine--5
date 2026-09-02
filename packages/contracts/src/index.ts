@@ -43,4 +43,10 @@ export {
   type InventoryEntry,
 } from './inventory.js';
 
+export {
+  ConfigurationError,
+  loadConfig,
+  type AlterConfig,
+} from './config.js';
+
 export { registry, type AlterRegistry } from './registry.js';

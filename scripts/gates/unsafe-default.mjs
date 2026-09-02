@@ -37,6 +37,7 @@ export const closes = 'Pattern 2 — missing configuration silently selected a m
  */
 const CONFIG_MODULES = [
   'packages/contracts/src/runtime-mode.ts',
+  'packages/contracts/src/config.ts',
   'scripts/',
 ];
 
