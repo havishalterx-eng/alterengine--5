@@ -15,7 +15,7 @@ Last updated: 2026-09-02 — Phase 0 scaffolding verified against real execution
 Verified on 2026-09-02, by running it, not by reading it:
 
 - `pnpm build` — typechecks clean, TypeScript 5.9.3, strict plus `noUncheckedIndexedAccess` and `exactOptionalPropertyTypes`
-- `pnpm test` — 9 tests pass across 2 files
+- `pnpm test` — 28 tests pass across 4 files
 - `pnpm gates` — all 5 gates run; each was proved to fire against a deliberate violation, then the fixture was removed
 - `node apps/api/dist/index.js`, and the worker and sandbox equivalents, all execute
 - `ALTER_RUNTIME_MODE=prod` throws rather than defaulting to something permissive
