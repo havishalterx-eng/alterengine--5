@@ -50,9 +50,25 @@ importers:
 
   apps/worker:
     dependencies:
+      '@alter/audit':
+        specifier: workspace:*
+        version: link:../../packages/audit
       '@alter/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
+
+  packages/audit:
+    dependencies:
+      '@alter/contracts':
+        specifier: workspace:*
+        version: link:../contracts
+      pg:
+        specifier: ^8.13.1
+        version: 8.23.0
+    devDependencies:
+      '@types/pg':
+        specifier: ^8.11.10
+        version: 8.23.1
 
   packages/contracts:
     dependencies:

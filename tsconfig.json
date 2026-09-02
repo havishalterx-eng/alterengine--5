@@ -6,6 +6,7 @@
     { "path": "packages/deletion-registry" },
     { "path": "packages/safety" },
     { "path": "packages/cost-ledger" },
+    { "path": "packages/audit" },
     { "path": "apps/api" },
     { "path": "apps/worker" },
     { "path": "apps/sandbox" }

@@ -216,3 +216,23 @@ Pinning one model per session keeps behaviour comparable across the build, so a 
 **Decided by:** Claude, as CEO, from published benchmarks. Havish supplied the available model lists.
 
 **Sources:** thenewstack.io on GLM-5.3 post-training; evolink.ai and benchlm.ai GLM-5.2/5.3 comparisons; qubrid.com Kimi K3 vs Qwen3.8-Max; llm-stats.com; labellerr.com; codingfleet.com DeepSeek V4 Pro vs Qwen 3.7 Max.
+
+---
+
+## 2026-09-02 — Component 38 (Audit) design decisions
+
+**Decision:** the audit chain is append-only at the database, not by application discipline. `prev_hash` and `entry_hash` are each 32 bytes with unique constraints on both, so a forked chain and a duplicate entry are impossible at the database. A `BEFORE UPDATE`/`BEFORE DELETE` trigger blocks every mutation unless the caller has opened the minimization path by setting the session variable `alter.allow_audit_minimization` to `on` inside a transaction. Even with the flag set, the trigger only permits the two legal mutations: nulling `payload` and setting `retention_until` (Section 18 minimization), and deleting an expired minimized skeleton. History columns are immutable even with the flag.
+
+**Reasoning:** the previous build's verifier was correct and never called. The fix is structural: immutability lives in the trigger, the verifier is driven by a named `@driver` on a schedule in the worker process, and a test asserts the driver exists and that a scheduled run catches a deliberately tampered entry. The `@driver` tag and the driver-existence gate make "machinery with nothing driving it" a gate finding rather than a review finding.
+
+**Decided by:** Builder C, per the CEO's brief for component 38.
+
+---
+
+## 2026-09-02 — Component 38 (Audit) verifier is a pure function over events
+
+**Decision:** the chain verifier's core is `verifyEvents(events)`, a pure function; `AuditChainVerifier.verify()` reads the real chain from the store and delegates. Fork and cycle are physically impossible to insert through the real store (the unique constraints forbid them), so those two modes are tested by feeding the pure function tampered event lists, while hash-mismatch and orphan are tested against the real database by inserting tampered rows via SQL.
+
+**Reasoning:** every failure mode must be provably caught. The database constraints are the first line of defence against fork and cycle; the verifier is the second, catching them if the constraints are ever dropped or data is restored from a tampered backup. Testing the pure function keeps that second line honest without weakening the real-execution requirement for the modes that can physically exist.
+
+**Decided by:** Builder C.
