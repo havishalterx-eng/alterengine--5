@@ -16,7 +16,9 @@
     "stack:up": "docker compose -f docker/compose.yml up -d",
     "stack:down": "docker compose -f docker/compose.yml down",
     "stack:logs": "docker compose -f docker/compose.yml logs -f",
-    "stack:wait": "node scripts/wait-for-stack.mjs"
+    "stack:wait": "node scripts/wait-for-stack.mjs",
+    "inventory": "node scripts/generate-inventory.mjs",
+    "inventory:check": "node scripts/generate-inventory.mjs --check"
   },
   "devDependencies": {
     "@types/node": "^22.10.2",

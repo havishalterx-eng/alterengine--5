@@ -64,6 +64,11 @@ jobs:
       - name: Tests
         run: pnpm test
 
+      - name: Capability inventory is current
+        # A registry change that was not regenerated cannot reach main, so the
+        # inventory and the code cannot drift apart silently.
+        run: pnpm inventory:check
+
       - name: Architecture gates
         run: pnpm gates
 

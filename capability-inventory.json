@@ -1,0 +1,38 @@
+{
+  "generatedFrom": "registry",
+  "total": 3,
+  "counts": {
+    "implemented": 1,
+    "unimplemented": 1,
+    "deferred": 1
+  },
+  "entries": [
+    {
+      "operation": "getSubscription",
+      "component": 43,
+      "capability": "billing.getSubscription",
+      "status": "deferred",
+      "method": "GET",
+      "path": "/billing/subscription",
+      "trackingReference": "ALTER-43"
+    },
+    {
+      "operation": "health",
+      "component": 48,
+      "capability": "platform.health",
+      "status": "implemented",
+      "method": "GET",
+      "path": "/health",
+      "trackingReference": null
+    },
+    {
+      "operation": "listWorkflows",
+      "component": 46,
+      "capability": "workspace.listWorkflows",
+      "status": "unimplemented",
+      "method": "GET",
+      "path": "/workflows",
+      "trackingReference": "ALTER-46"
+    }
+  ]
+}

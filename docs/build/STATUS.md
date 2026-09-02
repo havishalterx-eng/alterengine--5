@@ -101,7 +101,7 @@ Two shared primitives, both rule-enforcing, both tested. Nothing else.
 ### Phase 1 — Planes
 | # | Component | Owner | State |
 |---:|---|---|---|
-| 35 | Type/Schema Contracts | CEO | — |
+| 35 | Type/Schema Contracts | CEO | **PARTIAL** — gates 1,5,6 real; 7 half-blocked, see below |
 | 36 | Observability | | — |
 | 37 | Safety & Policy | | — |
 | 38 | Audit | | — |
@@ -196,6 +196,7 @@ Two shared primitives, both rule-enforcing, both tested. Nothing else.
 | 20 | Node Type Registry | Phase 2 — one node type | Phases 4–5 — Tool, Gate, HumanApproval, Merge | — |
 | 10 | Architecture Synthesizer | Phase 3 — decides topology | Phase 6 — Policy Store informs patterns | — |
 | 12 | Selection & Binding | Phase 3 — scoring | Phase 6 — learned routing weights | — |
+| 35 | Type/Schema Contracts | Phase 1 — 501 + inventory halves of gate 7 | Phase 3 — disabled-state half, once a UI exists | — |
 
 ---
 
@@ -204,6 +205,12 @@ Two shared primitives, both rule-enforcing, both tested. Nothing else.
 Components 36, 37, 38, 39 and 44-registration cannot start until 35 (Type/Schema Contracts) is merged. 35 generates the types every one of them imports; anything begun before it lands gets rewritten.
 
 35 belongs to the CEO. Until it merges, builders run the execution check and review their own contracts for done-gate items that cannot be written as executable tests.
+
+## Contract defects found
+
+Recorded as found, since fixing contracts is the CEO's job alone.
+
+**35, done-gate item 7 — cannot be fully tested in Phase 1.** It requires an unimplemented capability to return a real 501 *and* for "its interface to render a disabled state." No interface exists until Phase 3 (components 50–53). The 501 half and the inventory half are built and tested now against a genuinely unbuilt capability (`workspace.listWorkflows`, component 46). The disabled-state half is deferred to Phase 3 and must be revisited there, not quietly dropped — it is on the revisit table below.
 
 ## Blocked
 
