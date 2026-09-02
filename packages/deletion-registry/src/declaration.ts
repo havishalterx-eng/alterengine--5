@@ -35,6 +35,23 @@ export const tenantDataDeclarations: readonly TenantDataDeclaration[] = [
     component: 39,
     owner: 'Builder A',
   },
+  {
+    schema: 'public',
+    table: 'audit_events',
+    component: 38,
+    owner: 'Builder C',
+  },
 ];
 
-export const tenantDataExemptions: readonly TenantDataExemption[] = [];
+export const tenantDataExemptions: readonly TenantDataExemption[] = [
+  {
+    schema: 'public',
+    table: 'audit_alerts',
+    reason:
+      'Operational alerting about chain integrity. Rows record that a ' +
+      'verification run found a problem — kind and detail only, no tenant ' +
+      'column and no tenant data. Exempt because there is nothing here to ' +
+      'erase, not because erasing it would be inconvenient.',
+    owner: 'Builder C',
+  },
+];
