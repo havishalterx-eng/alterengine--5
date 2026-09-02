@@ -109,7 +109,9 @@ describe('36.2 — failing sink is fail-open and loud (done gate 3)', () => {
     const seen: unknown[] = [];
     const loudLogs: unknown[] = [];
     const emit = createObserver({
-      sink: (rec) => seen.push(rec),
+      sink: (rec) => {
+        seen.push(rec);
+      },
       redactor: () => {
         throw new Error('redactor down');
       },

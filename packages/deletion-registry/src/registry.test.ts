@@ -71,7 +71,9 @@ describe('44 — live-schema enumeration vs real Postgres (done gate 2)', () => 
     const probeDecls = tenantDataDeclarations.filter((d) => d.table !== probeTable);
     const first = certifySchemaCoverage(tables, probeDecls, tenantDataExemptions);
     expect(first.status).toBe('incomplete');
-    expect(first.unregistered).toContain(probeTable);
+    if (first.status === 'incomplete') {
+      expect(first.unregistered).toContain(probeTable);
+    }
 
     await client.query(`DROP TABLE ${probeTable}`);
     tables = await listLiveTables(client);
@@ -84,7 +86,9 @@ describe('44 — live-schema enumeration vs real Postgres (done gate 2)', () => 
       tenantDataExemptions,
     );
     expect(stale.status).toBe('incomplete');
-    expect(stale.stale).toContain(probeTable);
+    if (stale.status === 'incomplete') {
+      expect(stale.stale).toContain(probeTable);
+    }
   });
 });
 
@@ -96,7 +100,9 @@ describe('44 — fail-closed semantics (done gate 3)', () => {
       [],
     );
     expect(result.status).toBe('incomplete');
-    expect(result.unregistered).toEqual(['users']);
+    if (result.status === 'incomplete') {
+      expect(result.unregistered).toEqual(['users']);
+    }
   });
 
   it('exempted tables are explicitly out of scope, not silently skipped', () => {

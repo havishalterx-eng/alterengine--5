@@ -1,7 +1,7 @@
 import { observabilityRecordSchema, type ObservabilityRecord } from './schema.js';
 import { passThroughRedactor, type Redactor } from './redactor.js';
 
-export type Sink = (record: ObservabilityRecord) => void;
+export type Sink = (record: ObservabilityRecord) => void | Promise<void>;
 
 interface ObserverOptions {
   sink: Sink;
