@@ -197,6 +197,10 @@ Two shared primitives, both rule-enforcing, both tested. Nothing else.
 | 10 | Architecture Synthesizer | Phase 3 — decides topology | Phase 6 — Policy Store informs patterns | — |
 | 12 | Selection & Binding | Phase 3 — scoring | Phase 6 — learned routing weights | — |
 | 35 | Type/Schema Contracts | Phase 1 — 501 + inventory halves of gate 7 | Phase 3 — disabled-state half, once a UI exists | — |
+| 36 | Observability | Phase 1 — schema, attribution shape, fail-open outage | Phase 2 — real trace across a real run; Phase 5 — alerting via 45 | — |
+| 37 | Safety & Policy | Phase 1 — SSRF guard, redaction primitive, no-duplicate check | Phase 2 — injection classifier via 26; Phase 4 — PII on real egress paths | — |
+| 39 | Cost Ledger | Phase 1 — no-float, idempotency, verdict field present | Phase 2 — estimate vs real cost, verdicts against runs, multi-node attribution | — |
+| 38 | Audit | Phase 1 — full, four gates plus the scheduled verifier | Phase 7 — item 5b, account-deletion trigger | — |
 
 ---
 
@@ -205,6 +209,16 @@ Two shared primitives, both rule-enforcing, both tested. Nothing else.
 Components 36, 37, 38, 39 and 44-registration cannot start until 35 (Type/Schema Contracts) is merged. 35 generates the types every one of them imports; anything begun before it lands gets rewritten.
 
 35 belongs to the CEO. Until it merges, builders run the execution check and review their own contracts for done-gate items that cannot be written as executable tests.
+
+## Phase 1 scope
+
+Contract reviews found that the planes' done gates were written to be verified against a running system that does not exist until Phase 2. Split into a provable-now half and a mandatory revisit — see [`PHASE-1-SCOPE.md`](PHASE-1-SCOPE.md).
+
+**A component whose Phase 1 half passes is PARTIAL, never REAL**, and a PARTIAL component cannot be cited as a finished dependency. An unticked revisit row blocks its phase gate.
+
+## Gate defects — all five evadeable
+
+The Adversary reviewed the five architecture gates and evaded every one, four critically, with working code for each. They stay warn-only and block nobody, but **`GATE_MODE` must not flip until they are rebuilt.** Common root cause: all five match on identifier names, so any code that avoids the naming convention passes. The fix is AST plus a declared registry rather than regex over names. CEO owns it.
 
 ## Contract defects found
 
