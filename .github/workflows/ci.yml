@@ -103,15 +103,22 @@ jobs:
           }
 
           run_long_lived() {
-            echo "checking $1 starts and stays up"
+            echo "checking $1 starts without crashing"
             set +e
             timeout 10s node "$1"
             code=$?
             set -e
-            # 124 is timeout's exit code: still running when the clock ran out,
-            # which is exactly what a healthy worker should do.
-            if [ "$code" -ne 124 ]; then
-              echo "$1 exited with $code instead of staying up"
+            # 124 means still running when the clock ran out: a worker with
+            # schedules registered. 0 means it started and had nothing to keep
+            # it alive, which is correct on a branch where no component has
+            # scheduled anything yet.
+            #
+            # The first version of this demanded 124 only, and failed every
+            # branch that did not happen to contain component 38 -- asserting a
+            # property that is true of the destination rather than of the code
+            # under test. Anything else is a real crash.
+            if [ "$code" -ne 124 ] && [ "$code" -ne 0 ]; then
+              echo "$1 exited with $code"
               exit 1
             fi
           }
