@@ -1,3 +1,7 @@
+// TODO(component-44): add 'cost_ledger_entries' to tenantDataDeclarations
+// once Builder B's packages/deletion-registry lands on main. It holds
+// tenant rows, so erasure must reach it; the deletion-registration gate
+// flags it until then and that flag is correct.
 import { readFile } from 'node:fs/promises';
 import { Pool, type QueryResultRow } from 'pg';
 

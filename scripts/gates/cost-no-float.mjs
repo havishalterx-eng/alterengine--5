@@ -1,7 +1,7 @@
 import ts from 'typescript';
 import { readdir, readFile } from 'node:fs/promises';
 import { join, relative } from 'node:path';
-import { REPO_ROOT, finding, isTestFile } from './lib.mjs';
+import { REPO_ROOT, isTestFile } from './lib.mjs';
 
 /** Contract 39: money stays integer minor units; floating point is forbidden. */
 export const name = 'cost-no-float';
