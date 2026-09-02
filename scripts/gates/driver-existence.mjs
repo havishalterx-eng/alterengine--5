@@ -141,8 +141,13 @@ export async function run() {
       }
 
       const driver = declared[1];
-      const startedBy = parsed.find(
-        (candidate) => candidate.file !== file && callsDriver(candidate.source, driver),
+
+      // Same-file callers count. A process entry point invokes its own main()
+      // at module top level, which is a real driver — the process starts it.
+      // Requiring the caller to live elsewhere reported Builder C's worker
+      // boot as undriven when the line below it does exactly that.
+      const startedBy = parsed.find((candidate) =>
+        callsDriver(candidate.source, driver),
       );
 
       if (!startedBy) {
