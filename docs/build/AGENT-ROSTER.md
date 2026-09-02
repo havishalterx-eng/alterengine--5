@@ -10,15 +10,15 @@ Six agents plus the CEO session. Copy the brief verbatim into a fresh session on
 
 An **agent is a session in a coding IDE**, not a process and not a person. Four tools, three of them other than this one.
 
-| Agent | Role | IDE | Model | Worktree | Branch |
-|---|---|---|---|---|---|
-| — | CEO / Contract Keeper | Claude Code | Opus 5 | `/private/tmp/alterengine-5` | `main` |
-| A1 | **Adversary** | Codex | 5.6 Terra | `/private/tmp/wt-adversary` | detached |
-| A2 | **Builder A** | Codex | 5.6 Terra | `/private/tmp/wt-builder-a` | `agent/builder-a` |
-| A3 | Builder B | opencode | **GLM-5.3** | `/private/tmp/wt-builder-b` | `agent/builder-b` |
-| A4 | Integrator | opencode | **Qwen3.8 Max** | `/private/tmp/wt-integrator` | detached |
-| A5 | Builder C | Abacus AI code | **Kimi K3** | `/private/tmp/wt-builder-c` | `agent/builder-c` |
-| A6 | Floater | Abacus AI code | **ZAI GLM 5.3** | assigned on activation | — |
+| Role | IDE | Model | Worktree | Branch |
+|---|---|---|---|---|
+| CEO / Contract Keeper | Claude Code | Opus 5 | `/private/tmp/alterengine-5` | `main` |
+| **Adversary** | Codex | 5.6 Terra | `/private/tmp/wt-adversary` | detached |
+| **Builder A** | Codex | 5.6 Terra | `/private/tmp/wt-builder-a` | `agent/builder-a` |
+| Builder B | opencode | **GLM-5.3** | `/private/tmp/wt-builder-b` | `agent/builder-b` |
+| Integrator | opencode | **Qwen3.8 Max** | `/private/tmp/wt-integrator` | detached |
+| Builder C | Abacus AI code | **Kimi K3** | `/private/tmp/wt-builder-c` | `agent/builder-c` |
+| Floater | Abacus AI code | **ZAI GLM 5.3** | assigned on activation | — |
 
 **One model per session, fixed.** Pinned to the role, not switched per task, so behaviour stays comparable across the build and a bad result points at something.
 
@@ -93,7 +93,7 @@ An agent that cannot complete all five is not a Builder and not the Integrator. 
 
 ### The Floater
 
-A6 stays dark through Phase 1 and 2. It activates in **Phase 3**, assigned to verification, not to a fourth parallel component. Phase 3's moat chain (6 → 7 → 9 → 10) serializes, so idle build capacity is worth less than a second pair of eyes on the highest-risk work in the project. See `DECISIONS.md`.
+The Floater stays dark through Phase 1 and 2. It activates in **Phase 3**, assigned to verification, not to a fourth parallel component. Phase 3's moat chain (6 → 7 → 9 → 10) serializes, so idle build capacity is worth less than a second pair of eyes on the highest-risk work in the project. See `DECISIONS.md`.
 
 ---
 
@@ -124,7 +124,7 @@ The CEO verifies that echo before work starts. A wrong or missing echo means the
 
 ---
 
-## A2 — Builder A · Codex · GPT-5.6 Terra
+## Builder A · Codex · GPT-5.6 Terra
 
 ```
 Repository: https://github.com/havishalterx-eng/alterengine--5
@@ -178,7 +178,7 @@ PHASE 1 ASSIGNMENT — hold until the CEO issues it.
 
 ---
 
-## A3 — Builder B · opencode · GLM-5.3
+## Builder B · opencode · GLM-5.3
 
 ```
 Repository: https://github.com/havishalterx-eng/alterengine--5
@@ -221,7 +221,7 @@ PHASE 1 ASSIGNMENT — hold until the CEO issues it.
 
 ---
 
-## A5 — Builder C · Abacus AI code · Kimi K3
+## Builder C · Abacus AI code · Kimi K3
 
 ```
 Repository: https://github.com/havishalterx-eng/alterengine--5
@@ -272,7 +272,7 @@ PHASE 1 ASSIGNMENT — hold until the CEO issues it.
 
 ---
 
-## A4 — Integrator · opencode · Qwen3.8 Max
+## Integrator · opencode · Qwen3.8 Max
 
 ```
 Repository: https://github.com/havishalterx-eng/alterengine--5
@@ -321,7 +321,7 @@ PHASE 1 ASSIGNMENT — hold until the CEO issues it.
 
 ---
 
-## A1 — Adversary · Codex · GPT-5.6 Terra
+## Adversary · Codex · GPT-5.6 Terra
 
 ```
 Repository: https://github.com/havishalterx-eng/alterengine--5
@@ -394,7 +394,7 @@ FIRST TASK — this one comes BEFORE any component review.
 
 ---
 
-## A6 — Floater · Abacus AI code · ZAI GLM 5.3
+## Floater · Abacus AI code · ZAI GLM 5.3
 
 ```
 DO NOT LAUNCH YET.
@@ -427,11 +427,11 @@ Its first assignment, when it launches, is already known:
 ## What the CEO does at launch
 
 0. **Run the execution check in all six sessions first.** If two or more cannot reach the real stack, the role map changes before anything is sent.
-1. Send A1–A5. Hold A6.
+1. Send the five active roles. Hold the Floater.
 2. Verify each echo. Wrong echo, re-issue — do not correct mid-flight.
 3. Take **component 35 alone** in the CEO session. It blocks all of Phase 1; anything started before it lands gets rewritten.
 4. Release wave 2 (36, 37, 38, 39, 44-registration) only once 35 is merged.
-5. A1's gate review runs in parallel from day one — it depends on nothing and needs no running stack.
+5. the Adversary's gate review runs in parallel from day one — it depends on nothing and needs no running stack.
 
 ### Phase 1 at a glance
 
