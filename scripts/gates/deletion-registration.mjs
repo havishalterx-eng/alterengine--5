@@ -25,6 +25,13 @@ import { lineOf, parse, ts, walk } from './ast.mjs';
  * The second bug is also fixed: registration anywhere in a file no longer
  * satisfies every table in it. Each written table is checked by name.
  *
+ * Reconciled after Builder A was correctly blocked. This gate originally
+ * demanded a `registerForDeletion()` call, which contradicted the decision
+ * recorded in PHASE-1-SCOPE: the declaration lives in code as reviewable data,
+ * because a database row does not appear in a pull request diff. Builder B
+ * built the declarative form; the gate was the thing that was wrong, and
+ * Builder A refused to add a fake call to satisfy it, which is exactly right.
+ *
  * STAGED. This is the source-level layer. The Integrator owns the
  * schema-derived gate for component 44, which reads live tables from
  * information_schema and is the load-bearing one. Contract 44 forbids a
@@ -63,34 +70,26 @@ function tenantWrites(source) {
   return writes;
 }
 
-/** Table names this file registers, from registerForDeletion('table', ...). */
-function registeredTables(source) {
+const DECLARATION_FILE = 'packages/deletion-registry/src/declaration.ts';
+
+/**
+ * Tables named in the declaration file — both declared and exempt.
+ *
+ * Read by AST from source rather than imported from dist, so the gate works
+ * before anything is built and cannot be fooled by a stale compiled artefact.
+ * Returns null when the file does not exist yet.
+ */
+async function declaredTables(files) {
+  if (!files.includes(DECLARATION_FILE)) return null;
+
+  const { source } = await parse(DECLARATION_FILE);
   const tables = new Set();
 
   walk(source, (node) => {
-    if (!ts.isCallExpression(node)) return;
-
-    const callee = ts.isIdentifier(node.expression)
-      ? node.expression.text
-      : ts.isPropertyAccessExpression(node.expression)
-        ? node.expression.name.text
-        : undefined;
-
-    if (callee !== 'registerForDeletion') return;
-
-    for (const argument of node.arguments) {
-      if (ts.isStringLiteral(argument)) tables.add(argument.text.toLowerCase());
-      if (ts.isObjectLiteralExpression(argument)) {
-        for (const property of argument.properties) {
-          if (
-            ts.isPropertyAssignment(property) &&
-            property.name.getText(source).replace(/['"]/g, '') === 'table' &&
-            ts.isStringLiteral(property.initializer)
-          ) {
-            tables.add(property.initializer.text.toLowerCase());
-          }
-        }
-      }
+    if (!ts.isPropertyAssignment(node)) return;
+    if (node.name.getText(source).replace(/['"]/g, '') !== 'table') return;
+    if (ts.isStringLiteral(node.initializer)) {
+      tables.add(node.initializer.text.toLowerCase());
     }
   });
 
@@ -100,26 +99,31 @@ function registeredTables(source) {
 export async function run() {
   const findings = [];
   const files = await sourceFiles({ includeTests: false });
+  const declared = await declaredTables(files);
 
   for (const file of files) {
     if (isTestFile(file)) continue;
+    if (file === DECLARATION_FILE) continue;
 
     const { text, source } = await parse(file);
     if (NO_TENANT_DATA_TAG.test(text)) continue;
 
-    const registered = registeredTables(source);
-
     for (const { table, node } of tenantWrites(source)) {
-      if (registered.has(table.toLowerCase())) continue;
+      if (declared?.has(table.toLowerCase())) continue;
+
+      const where =
+        declared === null
+          ? `${DECLARATION_FILE} does not exist yet`
+          : `it is absent from ${DECLARATION_FILE}`;
 
       findings.push(
         finding({
           file,
           line: lineOf(source, node),
           message:
-            `Writes tenant rows to "${table}" with no registerForDeletion("${table}"). ` +
-            'Erasure would silently miss it. Registration anywhere else in this ' +
-            'file does not cover this table.',
+            `Writes tenant rows to "${table}" and ${where}. Erasure would ` +
+            'silently miss it. Add it to tenantDataDeclarations, or to ' +
+            'tenantDataExemptions with a reason and an owner.',
         }),
       );
     }
