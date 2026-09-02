@@ -104,9 +104,11 @@ export async function run() {
 
   for (const { file, text, source } of production) {
     for (const { name: verifier, node } of exportedVerifiers(source, text)) {
+      // Same-file callers count. A helper called by an exported function three
+      // lines away is driven; ignoring that reported Builder C's `checkEvent`
+      // as undriven when `verifyEvents` calls it twice in the same file.
       const calledFromProduction = production.some(
-        (candidate) =>
-          candidate.file !== file && callsTo(candidate.source, verifier) > 0,
+        (candidate) => callsTo(candidate.source, verifier) > 0,
       );
 
       if (calledFromProduction) continue;

@@ -44,7 +44,11 @@ export const closes = 'Rule 20 — erasure must reach every store';
 
 const NO_TENANT_DATA_TAG = /@no-tenant-data\b/;
 const TENANT_COLUMN = /\btenant_id\b/i;
-const WRITE = /\b(insert\s+into|update|upsert|merge\s+into)\s+([a-z_][a-z0-9_.]*)/i;
+// Requires a clause that only real DML has. Without this, the error message
+// 'audit_events is append-only: UPDATE blocked' matched, and "blocked" was
+// read as a table name -- a false positive against Builder C's component 38.
+const WRITE =
+  /\b(?:insert\s+into\s+([a-z_][a-z0-9_."]*)[\s(]|update\s+([a-z_][a-z0-9_."]*)\s+set\b|upsert\s+into\s+([a-z_][a-z0-9_."]*)|merge\s+into\s+([a-z_][a-z0-9_."]*))/i;
 
 /** SQL string literals that write, with the table they write to. */
 function tenantWrites(source) {
@@ -64,7 +68,10 @@ function tenantWrites(source) {
     if (!write) return;
     if (!TENANT_COLUMN.test(text)) return;
 
-    writes.push({ table: write[2], node });
+    const table = write[1] ?? write[2] ?? write[3] ?? write[4];
+    if (!table) return;
+
+    writes.push({ table: table.replace(/"/g, ''), node });
   });
 
   return writes;
