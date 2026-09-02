@@ -1,3 +1,19 @@
+/**
+ * Rule-path redaction. Phase 1 scope.
+ *
+ * KNOWN LIMITS, recorded by the Adversary rather than discovered later:
+ *
+ *   - Keys match with exact case. A rule for `customer.email` does not redact
+ *     `customer.Email`.
+ *   - A secret in a value with no matching rule is not found:
+ *     `{ note: 'Bearer <token>' }` passes through untouched.
+ *
+ * This is a rule-path primitive, not PII detection. General screening before
+ * egress arrives in Phase 4 with the real consumers (26, 27, 28, 29, 49) --
+ * see docs/build/PHASE-1-SCOPE.md. Until then a caller must name what to
+ * redact, and anything unnamed survives. Writing that down here so the gap is
+ * visible at the call site rather than assumed closed.
+ */
 export type JsonPrimitive = boolean | null | number | string;
 export type JsonValue = JsonPrimitive | JsonObject | JsonValue[];
 export interface JsonObject {
