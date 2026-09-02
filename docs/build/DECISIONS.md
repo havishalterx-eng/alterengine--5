@@ -145,3 +145,37 @@ Recording the mapping once rather than filling a PROCESS line in 55 contracts is
 The risk accepted: gates written and self-verified by the same session that wrote them carry that session's blind spots until Phase 1.
 
 **Decided by:** Claude, as CEO. Havish delegated the decision.
+
+---
+
+## 2026-09-02 — Agent lineup: four IDEs, two models
+
+**Decision:** an agent is a session in a coding IDE. Six of them across three IDEs besides Claude Code — two Codex sessions on 5.6 Terra, two opencode sessions on GLM 5.2, two Abacus AI code sessions on GLM 5.2 — plus the CEO session on Claude Code / Opus 5.
+
+Adversary and Builder A take the two Codex/Terra sessions. Builder B and Integrator take opencode. Builder C and the Floater take Abacus.
+
+**Reasoning:** four of the six sessions run the same model, so the differences between those four are harness differences, not model differences. Only Codex differs.
+
+That drives the layout. The reviewer must not be the same model as the reviewed — an Adversary sharing the blind spots of the code it checks turns the review into an expensive echo. So the Adversary is the odd model out, reviewing mostly GLM-written work.
+
+The second Codex session goes to Builder A, which carries component 37: the SSRF guard, the injection classifier, redaction. A defect there is a security vulnerability rather than a bug, which makes it the highest-consequence build in Phase 1.
+
+The Integrator is deliberately not on Codex, because of the execution risk below.
+
+No first-hand measurement of 5.6 Terra against GLM 5.2 on this codebase exists. The layout is reasoned from role leverage, not benchmark, and is to be revisited at the end of Phase 1 against findings-per-review and rework rate.
+
+**Decided by:** Havish chose the IDEs and models. Claude assigned roles to them.
+
+---
+
+## 2026-09-02 — Every session must prove it can reach the real stack before being assigned work
+
+**Decision:** before any agent is given a component, its session must run the five-command execution check in `AGENT-ROSTER.md` — bring the stack up, query Postgres, ping Redis, open a socket to Temporal, confirm `gh` auth. An agent that cannot complete all five is not a Builder and not the Integrator.
+
+**Reasoning:** the entire definition of done in this project is "verified against real execution." If an IDE sandboxes network access or blocks Docker, its agent physically cannot reach Postgres on 5440 or Temporal on 7240, and everything it reports as done is fixtures wearing a real name.
+
+That is the previous build's central failure — 114,000 lines that never ran — reintroduced through the tooling rather than through the code, and it would be invisible in every artefact we look at. A green test suite from a sandboxed agent looks exactly like a green test suite from a real one.
+
+Codex sandboxes command execution and has historically restricted network access. Abacus is unverified here. The check costs a minute per session and is the only cheap way to find out.
+
+**Decided by:** Claude, as CEO.

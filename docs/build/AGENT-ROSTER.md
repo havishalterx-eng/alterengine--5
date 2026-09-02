@@ -8,23 +8,53 @@ Six agents plus the CEO session. Copy the brief verbatim into a fresh session on
 
 ## Roster
 
-| Agent | Role | Platform | Worktree | Branch |
-|---|---|---|---|---|
-| — | CEO / Contract Keeper | Claude Opus (this session) | `/private/tmp/alterengine-5` | `main` |
-| A1 | Builder A | Codex | `/private/tmp/wt-builder-a` | `agent/builder-a` |
-| A2 | Builder B | opencode | `/private/tmp/wt-builder-b` | `agent/builder-b` |
-| A3 | Builder C | advocacy AI | `/private/tmp/wt-builder-c` | `agent/builder-c` |
-| A4 | Integrator | opencode | `/private/tmp/wt-integrator` | detached |
-| A5 | Adversary | Codex | `/private/tmp/wt-adversary` | detached |
-| A6 | Floater | advocacy AI | assigned on activation | — |
+An **agent is a session in a coding IDE**, not a process and not a person. Four tools, three of them other than this one.
 
-### Why these platforms
+| Agent | Role | IDE | Model | Worktree | Branch |
+|---|---|---|---|---|---|
+| — | CEO / Contract Keeper | Claude Code | Opus 5 | `/private/tmp/alterengine-5` | `main` |
+| A1 | **Adversary** | Codex | 5.6 Terra | `/private/tmp/wt-adversary` | detached |
+| A2 | **Builder A** | Codex | 5.6 Terra | `/private/tmp/wt-builder-a` | `agent/builder-a` |
+| A3 | Builder B | opencode | GLM 5.2 | `/private/tmp/wt-builder-b` | `agent/builder-b` |
+| A4 | Integrator | opencode | GLM 5.2 | `/private/tmp/wt-integrator` | detached |
+| A5 | Builder C | Abacus AI code | GLM 5.2 | `/private/tmp/wt-builder-c` | `agent/builder-c` |
+| A6 | Floater | Abacus AI code | GLM 5.2 | assigned on activation | — |
 
-Codex and opencode both read `AGENTS.md` natively, so their rules arrive without being pasted. I have no verified knowledge of what advocacy AI auto-loads, so its two briefs name every file explicitly and assume nothing is loaded for it. That is why the standard opener names files rather than trusting auto-load — it works on all three.
+### Why these assignments
 
-**Adversary and Integrator are the two roles where a weak agent costs the most**, because both are veto points. They get Codex and opencode, the two platforms whose behaviour is known here. The advocacy AI agents take Builder C and the Floater, the two roles where an underperforming agent is visible fastest and blocks least.
+**Four of six sessions run GLM 5.2.** Same model in two different harnesses (opencode, Abacus), so the differences between those four are harness differences, not model differences. Only the two Codex sessions run a different model.
 
-Revisit this after Phase 1. If advocacy AI outperforms, move it to a veto role.
+That single fact drives the layout. **The reviewer must not be the same model as the reviewed**, or the Adversary shares the exact blind spots of the code it is checking and the review becomes an expensive echo. So the Adversary is Codex/Terra, reviewing work that is mostly GLM-written.
+
+The second Codex session goes to **Builder A**, which carries component 37 — Safety & Policy. That is the highest-consequence build in Phase 1: it holds the SSRF guard, the injection classifier and redaction. A defect there is a security vulnerability, not a bug.
+
+Integrator is deliberately **not** Codex — see the sandbox risk below.
+
+I have no first-hand measurement of 5.6 Terra against GLM 5.2 on this codebase. This layout is reasoned from role leverage, not from benchmark. **Revisit at the end of Phase 1 with evidence** — findings-per-review for the Adversary, rework rate for the builders.
+
+### The single-Adversary risk
+
+One session vetoes every merge. That is a bottleneck by design, but it is also **one point of judgment failure**: anything that session is systematically blind to passes through untouched for the entire build.
+
+Partial mitigation already in place: the Adversary is a different model from most builders, the gates catch the four mechanical patterns without judgment, and the Integrator independently re-runs done gates against real dependencies. The residual risk is a class of defect that is neither mechanical nor caught by a done gate. The Floater is the reserve to spend on it if Phase 1 shows the Adversary missing things.
+
+### Before any of this is trusted: the execution check
+
+**Our whole definition of done is "verified against real execution."** If an IDE sandboxes network or blocks Docker, its agent cannot reach Postgres on 5440, Redis on 6390 or Temporal on 7240 — and every "done" it reports is fixtures wearing a real name. That is precisely the failure this rebuild exists to prevent, reintroduced through the tooling rather than the code.
+
+Codex in particular runs commands in a sandbox that has historically restricted network access. Abacus is unverified here.
+
+**Run this in every session before assigning it anything.** It takes a minute and it is the cheapest possible answer:
+
+```bash
+pnpm stack:up
+docker exec alter-engine-postgres-1 psql -U alter -d alter -tAc "select 1;"
+docker exec alter-engine-redis-1 redis-cli ping
+node -e "require('net').createConnection(7240,'127.0.0.1').on('connect',()=>{console.log('temporal reachable');process.exit(0)}).on('error',e=>{console.log('BLOCKED',e.code);process.exit(1)})"
+gh auth status
+```
+
+An agent that cannot complete all five is not a Builder and not the Integrator. It can still review, since the Adversary reads rather than runs. **Report the results before launch; the role map changes if two or more sessions fail this.**
 
 ### The Floater
 
@@ -59,7 +89,7 @@ The CEO verifies that echo before work starts. A wrong or missing echo means the
 
 ---
 
-## A1 — Builder A · Codex
+## A2 — Builder A · Codex · 5.6 Terra
 
 ```
 Repository: https://github.com/havishalterx-eng/alterengine--5
@@ -87,14 +117,25 @@ a branch.
 
 PHASE 1 ASSIGNMENT — hold until the CEO issues it.
   Wave 2, after component 35 lands:
-    COMPONENT 36 — Observability   (contracts.md § 36)
-    COMPONENT 39 — Cost Ledger     (contracts.md § 39)
+    COMPONENT 37 — Safety & Policy   (contracts.md § 37)
+    COMPONENT 39 — Cost Ledger       (contracts.md § 39)
 
-  36 is injected everywhere from that point on, so its shape is
-  load-bearing for every later component. 39 uses integer minor units,
-  rounds exactly once, and carries the verdict field from day one —
-  retrofitting a verdict after the ledger has rows is a migration
-  nobody wants.
+  37 is the highest-consequence build in Phase 1 and the reason this
+  role runs on the model it does. A defect here is a security
+  vulnerability, not a bug.
+
+  It carries the SSRF guard. The previous build's version was rated
+  ahead of most production systems and is described in docs/RULES.md
+  under "What the previous build got right" — DNS-pinned, the socket
+  forced to the validated IP, every redirect hop revalidated, private
+  ranges and CGNAT and link-local and IPv6 ULA and cloud metadata all
+  blocked, and the IPv4-mapped-IPv6 trap covered. Carry that design
+  forward. Do not reinvent it and do not weaken it. If you believe you
+  have found an improvement, escalate to the CEO before writing it.
+
+  39 uses integer minor units, rounds exactly once, and carries the
+  verdict field from day one — retrofitting a verdict after the ledger
+  has rows is a migration nobody wants.
 
   Both are `library` in the process layout. They run inside whichever
   process calls them; they are not services.
@@ -102,7 +143,7 @@ PHASE 1 ASSIGNMENT — hold until the CEO issues it.
 
 ---
 
-## A2 — Builder B · opencode
+## A3 — Builder B · opencode · GLM 5.2
 
 ```
 Repository: https://github.com/havishalterx-eng/alterengine--5
@@ -128,33 +169,32 @@ a branch.
 
 PHASE 1 ASSIGNMENT — hold until the CEO issues it.
   Wave 2, after component 35 lands:
-    COMPONENT 37 — Safety & Policy                    (contracts.md § 37)
-    COMPONENT 44 — Deletion & Retention, REGISTRATION ONLY (contracts.md § 44)
+    COMPONENT 36 — Observability                           (contracts.md § 36)
+    COMPONENT 44 — Deletion & Retention, REGISTRATION ONLY  (contracts.md § 44)
 
-  37 carries the SSRF guard. The previous build's version was rated
-  ahead of most production systems and is described in docs/RULES.md
-  under "What the previous build got right" — DNS-pinned, socket
-  forced to the validated IP, every redirect hop revalidated, with the
-  IPv4-mapped-IPv6 trap covered. Carry that design forward. Do not
-  reinvent it and do not weaken it.
+  36 is injected everywhere from this point on, so its shape is
+  load-bearing for every component that follows. Getting it wrong is
+  cheap to fix now and expensive to fix in Phase 4.
 
-  44 in Phase 1 is the registration interface and the CI gate ONLY.
-  Full erasure and the compensating saga are Phase 7. Build the
-  mechanism that makes an unregistered tenant table fail the build;
-  do not build erasure.
+  44 in Phase 1 is the registration interface ONLY. Full erasure and
+  the compensating saga are Phase 7. Build the mechanism that lets a
+  component holding tenant data declare itself; the CI gate that fails
+  the build on an unregistered tenant table belongs to the Integrator.
+  Coordinate the interface with them — do not build the gate yourself,
+  and do not build erasure.
 ```
 
 ---
 
-## A3 — Builder C · advocacy AI
+## A5 — Builder C · Abacus AI code · GLM 5.2
 
 ```
 Repository: https://github.com/havishalterx-eng/alterengine--5
 Worktree:   /private/tmp/wt-builder-c      (branch agent/builder-c)
 Role brief: docs/roles/builder.md
 
-Nothing is loaded for you automatically. Read the five files in the
-standard opener yourself before anything else.
+Read the five files in the standard opener yourself before anything
+else. Do not assume any of them were loaded for you.
 
 You are Builder C. You implement one component at a time.
 
@@ -197,7 +237,7 @@ PHASE 1 ASSIGNMENT — hold until the CEO issues it.
 
 ---
 
-## A4 — Integrator · opencode
+## A4 — Integrator · opencode · GLM 5.2
 
 ```
 Repository: https://github.com/havishalterx-eng/alterengine--5
@@ -246,7 +286,7 @@ PHASE 1 ASSIGNMENT — hold until the CEO issues it.
 
 ---
 
-## A5 — Adversary · Codex
+## A1 — Adversary · Codex · 5.6 Terra
 
 ```
 Repository: https://github.com/havishalterx-eng/alterengine--5
@@ -319,7 +359,7 @@ FIRST TASK — this one comes BEFORE any component review.
 
 ---
 
-## A6 — Floater · advocacy AI
+## A6 — Floater · Abacus AI code · GLM 5.2
 
 ```
 DO NOT LAUNCH YET.
@@ -351,8 +391,22 @@ Its first assignment, when it launches, is already known:
 
 ## What the CEO does at launch
 
+0. **Run the execution check in all six sessions first.** If two or more cannot reach the real stack, the role map changes before anything is sent.
 1. Send A1–A5. Hold A6.
 2. Verify each echo. Wrong echo, re-issue — do not correct mid-flight.
-3. Issue **component 35 alone** to the CEO session. It blocks all of Phase 1; anything started before it lands gets rewritten.
+3. Take **component 35 alone** in the CEO session. It blocks all of Phase 1; anything started before it lands gets rewritten.
 4. Release wave 2 (36, 37, 38, 39, 44-registration) only once 35 is merged.
-5. A5's gate review runs in parallel from day one — it depends on nothing.
+5. A1's gate review runs in parallel from day one — it depends on nothing and needs no running stack.
+
+### Phase 1 at a glance
+
+| Component | Agent | IDE / model |
+|---|---|---|
+| 35 Type/Schema Contracts | CEO | Claude Code / Opus 5 |
+| 37 Safety & Policy | Builder A | Codex / 5.6 Terra |
+| 39 Cost Ledger | Builder A | Codex / 5.6 Terra |
+| 36 Observability | Builder B | opencode / GLM 5.2 |
+| 44 registration interface | Builder B | opencode / GLM 5.2 |
+| 38 Audit | Builder C | Abacus / GLM 5.2 |
+| 44 CI gate | Integrator | opencode / GLM 5.2 |
+| Gate review | Adversary | Codex / 5.6 Terra |
