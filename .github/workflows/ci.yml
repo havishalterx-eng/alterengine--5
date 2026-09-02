@@ -15,6 +15,16 @@ env:
   # before it blocks anyone.
   GATE_MODE: warn
 
+  # Tests that touch a real dependency need these. Their absence is why CI
+  # was failing while every local run passed -- a local .env supplied them
+  # and CI had nothing, so the branch was verified under conditions the real
+  # system does not have.
+  ALTER_RUNTIME_MODE: test
+  DATABASE_URL: postgresql://alter:alter_local_dev@localhost:5440/alter
+  REDIS_URL: redis://localhost:6390
+  TEMPORAL_ADDRESS: localhost:7240
+  REDIS_KEY_PREFIX: alter:ci
+
 jobs:
   verify:
     runs-on: ubuntu-latest
