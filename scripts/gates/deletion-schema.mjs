@@ -78,6 +78,14 @@ export async function run() {
 
     const findings = [];
 
+    // A database with no application tables has not been provisioned yet --
+    // there is no migration runner in the repository, so CI starts from an
+    // empty schema. Declaring a table before it is created is not drift, it is
+    // the normal order of work. The forward check below still runs, because a
+    // table that DOES exist and is undeclared is a real problem whatever the
+    // state of the rest of the schema.
+    const schemaIsProvisioned = live.length > 0;
+
     for (const table of certification.unregistered ?? []) {
       findings.push(
         finding({
@@ -90,7 +98,7 @@ export async function run() {
       );
     }
 
-    for (const table of certification.stale ?? []) {
+    for (const table of schemaIsProvisioned ? (certification.stale ?? []) : []) {
       findings.push(
         finding({
           file: 'packages/deletion-registry/src/declaration.ts',

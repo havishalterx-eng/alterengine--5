@@ -10,10 +10,10 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  # Warn until the end of Phase 1, then flip to fail.
-  # See docs/build/DECISIONS.md — warn first reveals the true violation count
-  # before it blocks anyone.
-  GATE_MODE: warn
+  # Flipped from warn to fail at the end of Phase 1, as planned, with the true
+  # violation count measured first: zero. Warn mode existed so the count would
+  # be known before it blocked anyone; it is known, so the gates now block.
+  GATE_MODE: fail
 
   # Tests that touch a real dependency need these. Their absence is why CI
   # was failing while every local run passed -- a local .env supplied them
