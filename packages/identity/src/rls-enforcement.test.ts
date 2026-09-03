@@ -85,10 +85,11 @@ describe('RLS enforcement — Component 42 uses transaction-local tenant context
           await direct.query('COMMIT');
 
           await direct.query('BEGIN');
-          await expect(
-            direct.query('SELECT id FROM accounts WHERE id = $1', [tenantA.accountId]),
-          ).rejects.toThrow(/invalid input syntax for type uuid/);
-          await direct.query('ROLLBACK');
+          const reusedWithoutContext = await direct.query(
+            'SELECT id FROM accounts WHERE id = $1',
+            [tenantA.accountId],
+          );
+          await direct.query('COMMIT');
 
           await direct.query('BEGIN');
           await direct.query("SELECT set_config('app.current_account', $1, true)", [tenantB.accountId]);
@@ -97,8 +98,9 @@ describe('RLS enforcement — Component 42 uses transaction-local tenant context
 
           expect({
             tenantA: tenantARows.rowCount,
+            reusedWithoutContext: reusedWithoutContext.rowCount,
             tenantB: tenantBRows.rowCount,
-          }).toEqual({ tenantA: 1, tenantB: 1 });
+          }).toEqual({ tenantA: 1, reusedWithoutContext: 0, tenantB: 1 });
         } finally {
           await direct.end();
         }
