@@ -4,6 +4,12 @@ import {
   AuditStore,
 } from '@alter/audit';
 import { loadConfig } from '@alter/contracts';
+import {
+  createObserver,
+  type Observer,
+  passThroughRedactor,
+  type ObservabilityRecord,
+} from '@alter/observability';
 import { AuditRetentionSweeper } from './drivers/audit-retention-sweeper.js';
 import { AuditVerifierScheduler } from './drivers/audit-verifier-scheduler.js';
 
@@ -45,6 +51,13 @@ export function main(): void {
   // eslint-disable-next-line no-console
   console.log(`alter-worker starting in ${config.runtimeMode} mode`);
 
+  const observer = createObserver({
+    sink: writeObservabilityRecord,
+    // Safe only for these worker records: payloads contain system tick metadata
+    // (duration, status, count), never tenant audit payloads or identifiers.
+    redactor: passThroughRedactor,
+  });
+
   const store = new AuditStore({ connectionString: config.databaseUrl });
 
   // Apply the schema before anything schedules against it. Only tests called
@@ -53,7 +66,7 @@ export function main(): void {
   // existed but whose groundwork never ran.
   void store
     .ensureSchema()
-    .then(() => startSchedules(store))
+    .then(() => startSchedules(store, observer))
     .catch((error: unknown) => {
        
       console.error('alter-worker: could not apply the audit schema:', error);
@@ -67,11 +80,14 @@ export function main(): void {
  * main() is what lets the schedules start only after ensureSchema() resolves,
  * so the first verification tick has a table to verify.
  */
-function startSchedules(store: AuditStore): void {
+function startSchedules(
+  store: AuditStore,
+  observer: Observer,
+): void {
   const verifier = new AuditChainVerifier(store);
   const alerts = new AuditAlertSink(store.pool);
-  const scheduler = new AuditVerifierScheduler(verifier, alerts);
-  const sweeper = new AuditRetentionSweeper(store);
+  const scheduler = new AuditVerifierScheduler(verifier, alerts, observer);
+  const sweeper = new AuditRetentionSweeper(store, observer);
 
   // Chain verification runs on a schedule, unprompted. A non-valid result is
   // alerted by the scheduler; a failure to run at all is a loud crash.
@@ -92,6 +108,11 @@ function startSchedules(store: AuditStore): void {
         console.error('audit retention sweep failed to run:', error);
       });
   }, SWEEP_INTERVAL_MS);
+}
+
+function writeObservabilityRecord(record: ObservabilityRecord): void {
+  // eslint-disable-next-line no-console
+  console.log(JSON.stringify(record));
 }
 
 main();

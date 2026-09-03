@@ -51,7 +51,20 @@ interface ObserverOptions {
  * Composition-root observer. The only way a record reaches a sink.
  * Fail-open: sink errors are logged loudly and never propagate.
  */
-export function createObserver(options: ObserverOptions) {
+/**
+ * What a consumer holds.
+ *
+ * Exported because the first real consumer had to write
+ * `Pick<ReturnType<typeof createObserver>, 'emit'>` to inject an observer,
+ * and every consumer after it would have written the same thing or invented
+ * a different shape. Rule 18: one definition per shared primitive, and the
+ * definition belongs here rather than being reconstructed at each call site.
+ */
+export interface Observer {
+  emit(record: unknown): void;
+}
+
+export function createObserver(options: ObserverOptions): Observer {
   const redactor = options.redactor;
   const reportFailure =
     options.onSinkError ??

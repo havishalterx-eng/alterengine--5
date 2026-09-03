@@ -1,6 +1,7 @@
 import type {
   AuditAlertSink,
   AuditChainVerifier} from '@alter/audit';
+import { SYSTEM_TENANT, type Observer } from '@alter/observability';
 import {
   type VerificationResult,
 } from '@alter/audit';
@@ -20,6 +21,7 @@ export class AuditVerifierScheduler {
   constructor(
     private readonly verifier: AuditChainVerifier,
     private readonly alerts: AuditAlertSink,
+    private readonly observer: Observer,
   ) {}
 
   /**
@@ -28,10 +30,50 @@ export class AuditVerifierScheduler {
    * it.
    */
   async tick(): Promise<VerificationResult> {
-    const result = await this.verifier.verify();
-    if (!result.valid) {
-      await this.alerts.raise('verification_failed', result.issues);
+    const startedAt = Date.now();
+    this.observer.emit(record('audit.verification.tick.started', {}));
+
+    try {
+      const result = await this.verifier.verify();
+      if (!result.valid) {
+        await this.alerts.raise('verification_failed', result.issues);
+      }
+      this.observer.emit(
+        record('audit.verification.tick.finished', {
+          durationMs: Date.now() - startedAt,
+          issueCount: result.issues.length,
+          issueTypes: result.issues.map((issue) => issue.type),
+          outcome: result.valid ? 'valid' : 'invalid',
+        }),
+      );
+      return result;
+    } catch (error) {
+      this.observer.emit(
+        record('audit.verification.tick.finished', {
+          durationMs: Date.now() - startedAt,
+          error: errorMessage(error),
+          outcome: 'error',
+        }),
+      );
+      throw error;
     }
-    return result;
   }
+}
+
+function record(name: string, payload: Record<string, unknown>) {
+  return {
+    component: '38',
+    kind: 'event' as const,
+    name,
+    nodeId: 'audit-verifier-scheduler',
+    payload,
+    runId: 'system:worker',
+    schemaVersion: 1 as const,
+    scope: 'system' as const,
+    tenantId: SYSTEM_TENANT,
+  };
+}
+
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : 'unknown error';
 }

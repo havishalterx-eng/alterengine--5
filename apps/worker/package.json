@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@alter/audit": "workspace:*",
-    "@alter/contracts": "workspace:*"
+    "@alter/contracts": "workspace:*",
+    "@alter/observability": "workspace:*"
   }
 }

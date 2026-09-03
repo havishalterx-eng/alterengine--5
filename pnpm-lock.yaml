@@ -56,6 +56,9 @@ importers:
       '@alter/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
+      '@alter/observability':
+        specifier: workspace:*
+        version: link:../../packages/observability
 
   packages/audit:
     dependencies:

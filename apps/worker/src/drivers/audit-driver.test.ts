@@ -6,6 +6,7 @@ import {
   AuditChainVerifier,
   AuditStore,
 } from '@alter/audit';
+import { createObserver, passThroughRedactor } from '@alter/observability';
 import { AuditRetentionSweeper } from './audit-retention-sweeper.js';
 import { AuditVerifierScheduler } from './audit-verifier-scheduler.js';
 
@@ -40,8 +41,9 @@ beforeAll(async () => {
   await store.pool.query('TRUNCATE audit_events, audit_alerts RESTART IDENTITY CASCADE');
   const verifier = new AuditChainVerifier(store);
   const alerts = new AuditAlertSink(store.pool);
-  scheduler = new AuditVerifierScheduler(verifier, alerts);
-  sweeper = new AuditRetentionSweeper(store);
+  const observer = createObserver({ sink: () => {}, redactor: passThroughRedactor });
+  scheduler = new AuditVerifierScheduler(verifier, alerts, observer);
+  sweeper = new AuditRetentionSweeper(store, observer);
 });
 
 afterAll(async () => {
