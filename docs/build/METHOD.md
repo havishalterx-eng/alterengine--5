@@ -22,6 +22,10 @@ Phase 1 here ran four builders in parallel with verification by test report. It 
 
 Building one component at a time behind a surface a human can actually touch collapses "it looks done" and "it works" into the same claim. That is the point.
 
+## The order
+
+[`SEQUENTIAL-BUILD-ORDER.md`](SEQUENTIAL-BUILD-ORDER.md) lists all 49 remaining steps in strict sequence, each with the physical test that closes it.
+
 ## What this does not change
 
 The done gates, the ten architecture gates, `GATE_MODE=fail`, and the PARTIAL/REAL distinction all stand. `docs/build/STATUS.md` remains the single source of truth for progress, and every recorded revisit still blocks its phase gate.

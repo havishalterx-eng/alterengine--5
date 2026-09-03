@@ -23,8 +23,9 @@ Then your role brief in [`docs/roles/`](docs/roles/), then [`docs/build/STATUS.m
 | [`docs/roles/`](docs/roles/) | CEO · Builder · Integrator · Adversary |
 | [`docs/build/STATUS.md`](docs/build/STATUS.md) | **Single source of truth for progress** |
 | [`docs/build/DECISIONS.md`](docs/build/DECISIONS.md) | Append-only decision log |
-| [`docs/build/build-order.md`](docs/build/build-order.md) | Eight phases, waves, role assignments |
+| `docs/build/build-order.md` | Superseded wave-based order. Kept for its dependency reasoning |
 | [`docs/build/METHOD.md`](docs/build/METHOD.md) | **How this build runs.** Read before anything else |
+| [`docs/build/SEQUENTIAL-BUILD-ORDER.md`](docs/build/SEQUENTIAL-BUILD-ORDER.md) | **The 49 remaining steps, in order**, each with its physical test |
 | `docs/build/AGENT-ROSTER.md`, `SESSION-SETUP.md`, `LAUNCH-BRIEFS.md` | Superseded. Kept as the record of how Phase 1 was produced |
 | [`docs/architecture/contracts.md`](docs/architecture/contracts.md) | All 55 component contracts |
 | [`docs/architecture/whole.md`](docs/architecture/whole.md) | The engine as one system |
