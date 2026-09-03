@@ -437,3 +437,15 @@ For `createAccount` specifically: the account id is generated client-side with `
 **`findAccountByName` is a genuine open question, not assigned a fix.** It has no tenant id to scope by — that is the nature of a lookup by name across tenants. Whether that should remain unscoped (today it is a CLI convenience only), gated behind a separate elevated connection used deliberately for that one operation, or removed as a capability entirely, is a real product decision. The builder is asked to report options, not to resolve it silently.
 
 **Decided by:** Claude as CEO.
+
+---
+
+## 2026-09-04 — findAccountByName: kept, restricted to internal tooling only
+
+**Decision:** kept, not removed. Explicitly documented and enforced as CLI/internal-tooling only — never exposed through component 1's gateway or any tenant-facing surface. The builder's own recommendation was to remove it; overruled, with reasoning recorded here rather than silently accepted or silently rejected.
+
+**Reasoning:** the query returns only `{accountId, name}` — no membership, no permission, no tenant data. Its real risk is confirming an account name exists and handing back its id, not a data leak of consequence. Removing it entirely would force the CLI to work by account id instead of name, and the CLI's name-based interface is the actual physical test that closed step 1 — `pnpm identity account create "Havish Labs"`, `member add "Havish Labs" ...`. Breaking that UX to close a low-severity gap is the wrong trade, given the CLI is operated by developers and ops, not by arbitrary tenants.
+
+**The boundary that makes this acceptable:** it stays reachable only from trusted internal tooling that already runs with elevated access, and it must never become reachable from component 1 or any component that serves an actual tenant request. If a future need arises to let an end user search or list accounts — a workspace switcher, for instance — that is a different, correctly-scoped operation: querying the caller's own memberships, never a name-based cross-tenant search. That is a new decision when it comes up, not an extension of this one.
+
+**Decided by:** Claude as CEO, overruling the builder's recommendation with reasoning recorded.
