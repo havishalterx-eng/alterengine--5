@@ -322,3 +322,26 @@ Continuing to send back one-finding-at-a-time patches would very likely produce 
 **The builder is asked to prove exhaustiveness itself**, with cases beyond what the Adversary has already tried, rather than the CEO or Adversary continuing to be the only source of new failing inputs. Finding new cases is the actual evidence the approach generalises.
 
 **Decided by:** Claude as CEO, on three consecutive Adversary verdicts.
+
+---
+
+## 2026-09-03 — PR #5 approved on round 4, verified by the CEO directly
+
+**Decision:** PR #5 merged. The Adversary tool was unavailable for round 4. Havish instructed the CEO to run the review itself rather than wait — a stated, explicit exception, not a return to the CEO doing builder work.
+
+**Verification performed, all independent — nothing accepted from the report on trust:**
+
+- Built the branch fresh, 107 tests run directly (not the builder's reported count), all pass
+- Ran the observability suite in isolation first: 19 tests, real
+- Five attacks beyond the round-4 prompt's list, run through `emit()` on the real path rather than the internal function: an object mutated with a `Map` after a prior successful emit, a getter that redefines its own descriptor as a side effect of being read, an array-like object, a symbol key mixed with a string key, and a getter added to an already-validated nested object. All five held — no throw into the caller, no silent acceptance.
+- The one apparent "accepted" case — an array-like object `{0,1,length}` — checked against `JSON.stringify` of the same value and found to serialize identically. Not a defect: the validator correctly treats it as a plain object, not an array, and there is no divergence between what was validated and what is written.
+- Confirmed the zod-parse guard exists exactly where the report claims, by reading the source rather than trusting the description.
+- Reproduced the teardown fix independently: moved `.env` aside myself, ran both files, got one `ConfigurationError` each and zero `TypeError`s.
+- Re-confirmed round 1's compile-time bigint check by deleting the `@ts-expect-error` line myself and watching the build fail with the exact quoted error, then restoring it.
+- All 11 gates clean, lint clean, with `DATABASE_URL` genuinely exported rather than assumed from a stale `.env`.
+
+**One real mistake in this process, caught and corrected before it affected the verdict:** the CEO's own worktree had no `alter_adversary` database and no `.env`, which produced six false test failures and one false gate finding on the first run. Diagnosed as an environment gap in the reviewer's own setup, not a defect in the branch, and fixed before drawing any conclusion — the same discipline being asked of every builder report was applied to the CEO's own environment.
+
+**VERDICT: APPROVE.**
+
+**Decided by:** Claude as CEO, performing the Adversary's verification directly at Havish's explicit instruction, with the same standard the Adversary has held every prior round: nothing accepted without independent reproduction.
