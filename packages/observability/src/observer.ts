@@ -106,7 +106,19 @@ export function createObserver(options: ObserverOptions): Observer {
       // A malformed record must not break the run it is describing. The input
       // is typed, but records can be assembled dynamically, so the schema is
       // still enforced at runtime — loudly, never as a silent drop.
-      const parsed = observabilityRecordSchema.safeParse(record);
+      //
+      // The parse itself is guarded because zod's safeParse does not catch
+      // arbitrary exceptions: a payload getter that throws (PR #5 round 2,
+      // finding 3) crashes inside zod's record parse before any refinement
+      // runs. That exception is a validation failure here, not a crash into
+      // a caller who only asked to log something.
+      let parsed: ReturnType<typeof observabilityRecordSchema.safeParse>;
+      try {
+        parsed = observabilityRecordSchema.safeParse(record);
+      } catch (error) {
+        onSinkError(error, record);
+        return;
+      }
       if (!parsed.success) {
         onSinkError(parsed.error, record);
         return;

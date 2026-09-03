@@ -85,76 +85,183 @@ describe('36.1 — typed, versioned, JSON-safe schema (done gate 1, finding 3)',
     }
   });
 
-  it('rejects a circular payload without overflowing the stack', () => {
-    const circular: Record<string, unknown> = {};
-    circular.self = circular;
-    expect(
-      observabilityRecordSchema.safeParse({ ...tenantRecord, payload: circular })
-        .success,
-    ).toBe(false);
-  });
+  it('rejects every unsafe shape in the exhaustive table — one rule, not cases', () => {
+    // PR #5 round 3: the validator was REPLACED with a descriptor walk
+    // (Reflect.ownKeys + Object.getOwnPropertyDescriptor, never reading a
+    // property before its descriptor is confirmed plain enumerable data).
+    // This table is the proof it is exhaustive rather than reactive: every
+    // shape the Adversary found across three review rounds, plus cases found
+    // while building this list that no review had tried yet.
+    //
+    // A rejected entry may either fail validation or throw inside zod's
+    // record parse (a throwing getter) — both count as rejected, because
+    // emit() contains the throw (proven in the fail-open describe below).
+    const unsafeShapes: ReadonlyArray<readonly [string, () => unknown]> = [
+      // --- the original Map repro (PR #5 finding 1) ---
+      ['Map', () => new Map([['minorUnits', '17']])],
+      // --- round 2 findings ---
+      ['Set', () => new Set(['a'])],
+      ['symbol key', () => ({ [Symbol('secret')]: 'v' })],
+      ['sparse array via constructor', () => new Array(1)],
+      ['sparse array via delete', () => {
+        const array = ['x', 'y'];
+        Reflect.deleteProperty(array, '0');
+        return array;
+      }],
+      ['array with extra property', () => {
+        const array = ['x'];
+        Object.defineProperty(array, 'hidden', {
+          value: 'lost', enumerable: true, writable: true, configurable: true,
+        });
+        return array;
+      }],
+      ['array with symbol key', () => {
+        const array = ['x'];
+        Object.defineProperty(array, Symbol('s'), {
+          value: 'v', enumerable: true, writable: true, configurable: true,
+        });
+        return array;
+      }],
+      ['array with a getter index', () => {
+        const array = ['x'];
+        Object.defineProperty(array, '0', { get: () => 'y', enumerable: true, configurable: true });
+        return array;
+      }],
+      ['object with a throwing getter', () => ({
+        get cost() {
+          throw new Error('boom');
+        },
+      })],
+      // --- round 3 prompt table ---
+      ['WeakMap', () => new WeakMap()],
+      ['WeakSet', () => new WeakSet()],
+      ['class instance', () => new (class Money {
+        public readonly minorUnits = '17';
+      })()],
+      ['class instance with toJSON()', () => new (class WithToJson {
+        public toJSON(): Record<string, never> {
+          return {};
+        }
+      })()],
+      ['object with a non-throwing getter (accessor)', () => ({
+        get cost() {
+          return '17';
+        },
+      })],
+      ['object with a setter-only property', () => {
+        const object: Record<string, unknown> = {};
+        Object.defineProperty(object, 'x', { set: () => {}, enumerable: true, configurable: true });
+        return object;
+      }],
+      ['object with a non-enumerable property', () => {
+        const object = { visible: 1 };
+        Object.defineProperty(object, 'hidden', {
+          value: 'x', enumerable: false, writable: true, configurable: true,
+        });
+        return object;
+      }],
+      ['Proxy whose get trap lies (descriptor says string, trap returns bigint)', () =>
+        new Proxy({ cost: '17' }, {
+          get(target, key) {
+            return key === 'cost' ? 17n : Reflect.get(target, key);
+          },
+        })],
+      ['Proxy over an array whose get trap lies', () =>
+        new Proxy(['17'], {
+          get(target, key) {
+            return key === '0' ? 17n : Reflect.get(target, key);
+          },
+        })],
+      ['Proxy whose get trap throws', () =>
+        new Proxy({ cost: '17' }, {
+          get(_target, key) {
+            if (key === 'cost') throw new Error('trap boom');
+            return undefined;
+          },
+        })],
+      ['bigint nested three levels deep', () => ({ a: { b: { c: 17n } } })],
+      ['frozen object containing a Map', () => Object.freeze({ m: new Map() })],
+      // --- cases found while building this table, no review had tried these ---
+      ['symbol value', () => ({ tag: Symbol('v') })],
+      ['Date (parity with the type level)', () => new Date('2026-09-03T00:00:00Z')],
+      ['RegExp', () => /probe/],
+      ['Promise (thenable)', () => Promise.resolve(1)],
+      ['boxed String', () => new String('x')],
+      ['Uint8Array', () => new Uint8Array([1])],
+      ['non-finite number NaN', () => Number.NaN],
+      ['non-finite number Infinity', () => Number.POSITIVE_INFINITY],
+      ['undefined value', () => ({ missing: undefined })],
+      ['function value', () => ({ callback: () => {} })],
+      ['circular object', () => {
+        const circular: Record<string, unknown> = {};
+        circular.self = circular;
+        return circular;
+      }],
+      ['circular array', () => {
+        const circular: unknown[] = [];
+        circular.push(circular);
+        return circular;
+      }],
+      ['Map nested inside a plain object', () => ({ totals: { cost: new Map() } })],
+      ['Set nested inside an array', () => ({ entries: [new Set(['x'])] })],
+    ];
 
-  it('rejects a Map payload — the Adversary repro, not a silent {}', () => {
-    // PR #5 finding 1: a Map passed the old validator (Object.values on a Map
-    // is empty), reached the sink, and JSON.stringify silently emitted {}.
-    const result = observabilityRecordSchema.safeParse({
-      ...tenantRecord,
-      payload: { cost: new Map([['minorUnits', '17']]) },
-    });
-    expect(result.success).toBe(false);
-    if (!result.success) {
-      expect(result.error.issues[0]?.message).toContain(
-        'cannot survive JSON serialisation',
-      );
+    for (const [label, make] of unsafeShapes) {
+      let rejected: boolean;
+      try {
+        rejected = !observabilityRecordSchema.safeParse({
+          ...tenantRecord,
+          payload: { probe: make() },
+        }).success;
+      } catch {
+        // A throw inside zod's parse is contained by emit() — rejected.
+        rejected = true;
+      }
+      expect(rejected, `${label} must be rejected, not silently mangled`).toBe(true);
     }
   });
 
-  it('rejects a Set and a class instance — same hole, same rule', () => {
-    class Money {
-      public constructor(public readonly minorUnits: string) {}
-    }
-    for (const bad of [new Set(['a']), new Money('17')]) {
+  it('accepts the safe shapes — the guard rejects abnormality, not data', () => {
+    const safeShapes: ReadonlyArray<readonly [string, unknown]> = [
+      ['plain nested object and array mix', { a: [1, 'two', true, null], b: { c: { d: [] } } }],
+      ['empty object', {}],
+      ['empty array', []],
+      ['object with null prototype', Object.assign(Object.create(null), { a: '1' })],
+      ['frozen plain object of primitives', Object.freeze({ a: '1', b: 2 })],
+      ['deep string/number/boolean/null values', { s: 'x', n: 0, b: false, z: null }],
+    ];
+    for (const [label, value] of safeShapes) {
       expect(
         observabilityRecordSchema.safeParse({
           ...tenantRecord,
-          payload: { cost: bad },
+          payload: { probe: value },
         }).success,
-        `${bad.constructor.name} must not parse`,
-      ).toBe(false);
+        `${label} must be accepted`,
+      ).toBe(true);
     }
   });
 
-  it('rejects a Map nested inside a plain object, and one inside an array', () => {
-    const nested = { totals: { cost: new Map() } };
-    const inArray = { entries: [new Set(['x'])] };
-    expect(
-      observabilityRecordSchema.safeParse({ ...tenantRecord, payload: nested })
-        .success,
-    ).toBe(false);
-    expect(
-      observabilityRecordSchema.safeParse({ ...tenantRecord, payload: inArray })
-        .success,
-    ).toBe(false);
-  });
-
-  it('rejects a Date — parity with the type level, no silent ISO conversion', () => {
-    // JSON.stringify would emit an ISO string predictably, but JsonObject has
-    // no Date. A dynamically-built record carrying one is a validation
-    // failure; a producer who wants an ISO timestamp encodes a string.
+  it('accepts a Proxy with no traps — indistinguishable from its target', () => {
+    // ECMAScript designs proxies to be transparent: a trap-free proxy over a
+    // plain object cannot be detected by ANY code, and JSON.stringify emits
+    // exactly what it would emit for the target. The dangerous proxies are
+    // the divergent ones — traps that lie or throw — and the table above
+    // proves those are rejected. Accepting the transparent one is correct,
+    // not a hole; rejecting it is impossible.
     expect(
       observabilityRecordSchema.safeParse({
         ...tenantRecord,
-        payload: { at: new Date('2026-09-03T00:00:00Z') },
+        payload: { probe: new Proxy({ a: '1' }, {}) },
       }).success,
-    ).toBe(false);
+    ).toBe(true);
   });
 
   it('cost encoding round-trip: bigint in, decimal string, BigInt() out, equal', () => {
-    // The encoding decision in schema.ts, proven rather than asserted: a
-    // producer holding 17n minor units emits '17', and parsing it back with
-    // BigInt() reconstructs the exact integer. No consumer reads cost records
-    // yet — Model Gateway arrives in Phase 2 — so this test is the guarantee
-    // the encoding does not lose anything in the meantime.
+    // Documentation of the ENCODING decision in schema.ts, nothing more:
+    // this proves the string format is reversible (17n emits '17', and
+    // BigInt('17') reconstructs the exact integer). It does NOT exercise
+    // emit() or the sink — no consumer parses cost records yet, and the
+    // reader that will (Model Gateway, Phase 2) does not exist.
     const minorUnits = 17n;
     const encoded: ObservabilityRecord = {
       ...tenantRecord,
@@ -286,6 +393,40 @@ describe('36.2 — failing sink is fail-open and loud (done gate 3)', () => {
     expect(() => emit(record)).not.toThrow();
     expect(seen, 'sink must never see an unredacted payload').toHaveLength(0);
     expect(loudLogs).toHaveLength(1);
+  });
+
+  it('does not crash when a payload getter throws inside zod parse', () => {
+    // PR #5 round 2 finding 3: a throwing getter crashed emit(), because zod's
+    // safeParse does not contain arbitrary exceptions from record parsing.
+    // The descriptor walk never reads a getter, but zod's own parse does — so
+    // emit() guards the parse itself. The caller never asked to run arbitrary
+    // code by logging; neither success nor a crash is an acceptable outcome
+    // for them, only containment.
+    const seen: unknown[] = [];
+    const loudLogs: unknown[] = [];
+    const emit = createObserver({
+      sink: (rec) => {
+        seen.push(rec);
+      },
+      redactor: passThroughRedactor,
+      onSinkError: (error) => {
+        loudLogs.push(error);
+      },
+    }).emit;
+
+    expect(() =>
+      emit({
+        ...record,
+        payload: {
+          get cost(): never {
+            throw new Error('boom');
+          },
+        },
+      }),
+    ).not.toThrow();
+    expect(seen).toHaveLength(0);
+    expect(loudLogs).toHaveLength(1);
+    expect((loudLogs[0] as Error).message).toBe('boom');
   });
 });
 

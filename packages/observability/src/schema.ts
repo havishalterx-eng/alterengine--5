@@ -20,8 +20,10 @@ export const OBSERVABILITY_SCHEMA_VERSION = 1;
   * A string carries the exact integer. Never emit cost as bigint or float.
   *
   * No consumer parses this back yet. Model Gateway, the real reader, arrives
-  * in Phase 2; until then the only proof of the encoding is the round-trip
-  * test in observability.test.ts (bigint in, `BigInt(string)` out, equal).
+  * in Phase 2; until then the encoding's only proof is the round-trip test
+  * in observability.test.ts, which shows the string format is reversible
+  * (17n emits '17', BigInt('17') is exact). That test documents the encoding
+  * decision — it does not exercise emit() or the sink.
   */
 
 export interface TenantAttribution {
@@ -71,16 +73,36 @@ interface ObservabilityRecordBase {
 export type ObservabilityRecord = ObservabilityRecordBase & ObservabilityAttribution;
 
 /**
- * A value is JSON-safe if JSON.stringify cannot mangle or drop it: bigint,
- * symbol, function, undefined, non-finite numbers, cycles, and anything that
- * is not a PLAIN object or array are not.
+ * A value is JSON-safe if JSON.stringify cannot mangle, drop, or throw on it.
  *
- * The plain-object rule closed the hole the compile-time fix could not see
- * (Adversary finding 1 on PR #5): a Map, a Set, or a class instance passes
- * `typeof value === 'object'`, survives Object.values recursion (its own
- * enumerable properties are empty or incidental), and then JSON.stringify
- * silently emits `{}` — data gone, nothing reported. Only a prototype of
- * Object.prototype or null serialises predictably.
+ * REPLACED, not patched (PR #5 round 3): the previous validator walked values
+ * with Object.values() and .every(), which are built to iterate normal data,
+ * not to certify that nothing abnormal is present. Each review round found
+ * another shape they skip — Map, then Symbol keys, sparse arrays, extra array
+ * properties, throwing getters. This version never asks a convenience method
+ * whether a shape looks fine. It walks every own key with Reflect.ownKeys and
+ * Object.getOwnPropertyDescriptor, and NEVER reads a property until its
+ * descriptor has been confirmed to be a plain enumerable data property with
+ * no get/set — so a getter cannot run, and invisible keys cannot hide.
+ *
+ * Correct by construction, not by accumulated test case:
+ *   - primitives: string, finite number, boolean, null are safe
+ *   - undefined, bigint, symbol, function are unsafe
+ *   - arrays: exactly the indices 0..length-1 plus 'length' in own keys —
+ *     no holes, no extra properties, no symbol keys; every index a plain
+ *     enumerable data property
+ *   - plain objects: prototype Object.prototype or null, no symbol keys,
+ *     every own key a plain enumerable data property
+ *   - anything else (Map, Set, Date, class instance, boxed primitive,
+ *     typed array, ...) is unsafe by falling through, not by enumeration
+ *
+ * After a descriptor is confirmed plain data, the live property is read once
+ * and compared with descriptor.value. On a real object a plain data property
+ * read cannot run code, so this violates nothing — but on a Proxy the read
+ * goes through the get trap, and a trap that lies or throws diverges from the
+ * descriptor and is rejected. A Proxy with NO traps is indistinguishable from
+ * its target by ECMAScript design and serialises identically to it, so it
+ * passes — the dangerous proxies are the divergent ones, and those are caught.
  *
  * This deliberately REJECTS values JSON.stringify can handle, like Date (it
  * stringifies to ISO form). Parity with the type level is the rule: JsonObject
@@ -91,9 +113,22 @@ export type ObservabilityRecord = ObservabilityRecordBase & ObservabilityAttribu
  * Cycles are tracked with a seen-set, so a circular payload is reported as a
  * validation failure instead of overflowing the stack.
  */
-function isPlainObject(value: object): boolean {
-  const prototype = Object.getPrototypeOf(value);
-  return prototype === Object.prototype || prototype === null;
+function isPlainEnumerableDataProperty(
+  descriptor: PropertyDescriptor | undefined,
+): boolean {
+  return (
+    descriptor !== undefined &&
+    descriptor.get === undefined &&
+    descriptor.set === undefined &&
+    descriptor.enumerable === true &&
+    'value' in descriptor
+  );
+}
+
+/** A canonical array index: "0", "1", ... — not "01", not "-1", not "1e2". */
+function isCanonicalIndex(key: string, length: number): boolean {
+  if (!/^(0|[1-9][0-9]*)$/.test(key)) return false;
+  return Number(key) < length;
 }
 
 function isJsonSafe(value: unknown, seen: ReadonlySet<object>): boolean {
@@ -123,20 +158,84 @@ function isJsonSafe(value: unknown, seen: ReadonlySet<object>): boolean {
   }
   const nextSeen = new Set(seen);
   nextSeen.add(value);
-  if (Array.isArray(value)) {
-    return value.every((child) => isJsonSafe(child, nextSeen));
+  return Array.isArray(value)
+    ? isArrayShapeSafe(value, nextSeen)
+    : isPlainObjectShapeSafe(value, nextSeen);
+}
+
+/**
+ * An array is safe only if its own keys are exactly 0..length-1 plus
+ * 'length'. A hole is an index within length that is NOT an own key (a sparse
+ * array would serialize it as null); an extra key like arr.hidden would be
+ * silently dropped; a symbol key is invisible to JSON. Every index must be a
+ * plain enumerable data property, read live only after its descriptor is
+ * confirmed (Proxy divergence check — see the walkthrough above).
+ */
+function isArrayShapeSafe(
+  value: readonly unknown[],
+  seen: ReadonlySet<object>,
+): boolean {
+  const length = value.length;
+  const indexKeys = new Set<string>();
+
+  for (const key of Reflect.ownKeys(value)) {
+    if (typeof key === 'symbol') return false;
+    if (key === 'length') continue;
+    if (!isCanonicalIndex(key, length)) return false;
+    indexKeys.add(key);
   }
-  if (!isPlainObject(value)) {
-    return false;
+
+  if (indexKeys.size !== length) return false;
+
+  for (let index = 0; index < length; index += 1) {
+    const key = String(index);
+    const descriptor = Object.getOwnPropertyDescriptor(value, key);
+    if (!isPlainEnumerableDataProperty(descriptor)) return false;
+    if (!Object.is(value[index], descriptor?.value)) return false;
+    if (!isJsonSafe(descriptor?.value, seen)) return false;
   }
-  return Object.values(value).every((child) => isJsonSafe(child, nextSeen));
+  return true;
+}
+
+/**
+ * A plain object is safe only if its prototype is Object.prototype or null
+ * (not a Map, a Set, a class instance, anything custom), it has no symbol
+ * keys (JSON cannot carry them), and every own key is a plain enumerable data
+ * property — read live only after the descriptor is confirmed.
+ */
+function isPlainObjectShapeSafe(
+  value: object,
+  seen: ReadonlySet<object>,
+): boolean {
+  const prototype = Object.getPrototypeOf(value);
+  if (prototype !== Object.prototype && prototype !== null) return false;
+
+  for (const key of Reflect.ownKeys(value)) {
+    if (typeof key === 'symbol') return false;
+    const descriptor = Object.getOwnPropertyDescriptor(value, key);
+    if (!isPlainEnumerableDataProperty(descriptor)) return false;
+    // Live read AFTER the descriptor is confirmed plain data: on a real
+    // object this cannot run code; on a Proxy it pierces the get trap.
+    if (!Object.is(Reflect.get(value, key), descriptor?.value)) return false;
+    if (!isJsonSafe(descriptor?.value, seen)) return false;
+  }
+  return true;
 }
 
 const jsonSafePayload = z
   .record(z.string(), z.unknown())
   .superRefine((payload, ctx) => {
     for (const [key, value] of Object.entries(payload)) {
-      if (!isJsonSafe(value, new Set())) {
+      // The walk itself must not be able to crash emit(): a Proxy trap that
+      // throws during Reflect.ownKeys or the post-descriptor live read turns
+      // into a validation failure, never an exception escaping safeParse.
+      let safe: boolean;
+      try {
+        safe = isJsonSafe(value, new Set());
+      } catch {
+        safe = false;
+      }
+      if (!safe) {
         ctx.addIssue({
           code: 'custom',
           path: [key],
