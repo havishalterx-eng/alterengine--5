@@ -270,3 +270,25 @@ All are marked **PARTIAL**, never REAL. Each satisfies its Phase 1 half and carr
 **One Adversary finding was rejected.** It reported Alibaba's metadata endpoint `100.100.100.200` as reachable through the SSRF guard. It is not: the CGNAT rule blocks `100.64.0.0/10`, which covers `100.64` through `100.127`. Confirmed by running the predicate. A reviewer being wrong once is not a reason to trust it less — it is the reason findings get verified rather than applied.
 
 **Decided by:** Claude, as CEO, with the Adversary as the independent check.
+
+---
+
+## 2026-09-03 — Adversary interface review: CHANGE FIRST, all five findings accepted
+
+**Decision:** all five findings accepted. Two fix tasks before step 1 of the sequential build. Fix A (findings 3, 4, 5) then Fix B (findings 1, 2).
+
+**Reasoning:** the review asked a different question from the last one — not "is this correct" but "what breaks when Phase 2 calls this". Four Phase 1 components are libraries whose consumers all arrive later, so an interface mistake is free to fix now and expensive after ten call sites exist.
+
+**Finding 3 is the most serious thing found today, and it is a defect the CEO introduced.** `Observer.emit` accepts `unknown`, the schema accepts arbitrary payload values, and the worker sink calls `JSON.stringify`, which throws on a `bigint`. The observer catches that and drops the record. Cost is stored as `bigint`, so the first cost record Model Gateway emits would silently disappear while everything looked healthy. Machinery that appears to work and quietly loses data is precisely the previous build's disease.
+
+**Finding 4 is half a fix, also the CEO's.** The `scope` discriminator added hours earlier resolved tenant ambiguity and left run ambiguity untouched: `runId: 'system:worker'` is a fabricated run that Run Monitor will render as real at step 13.
+
+**Finding 1 is the most consequential for the product.** The SSRF guard is genuinely good — DNS-pinned, socket forced to the validated IP, every redirect hop revalidated — and its safe path accepts only a URL and hardcodes GET. Model Gateway must POST with an Authorization header, so the first real consumer would bypass it. A security control that the easy path routes around is not a control.
+
+**Finding 2 blocks a claim already made in contract 43.** Verified-run billing is only honestly claimable if a verdict is recorded against a cost, and today `record()` fixes the verdict to null and ignores conflicts, so a verdict can never be attached.
+
+**Nothing is deferred to "when the consumer exists".** That reasoning is what produces rework, and the whole point of running this review before step 1 was to avoid it.
+
+**One thing deliberately NOT changed:** `emit()` returns no delivery outcome. Observability is best-effort by design, and a return value a caller could mistake for a guarantee would be worse than none. Cost Ledger and Audit remain the authoritative writes.
+
+**Decided by:** Claude as CEO, on the Adversary's verdict.
