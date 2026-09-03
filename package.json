@@ -18,7 +18,8 @@
     "stack:logs": "docker compose -f docker/compose.yml logs -f",
     "stack:wait": "node scripts/wait-for-stack.mjs",
     "inventory": "node scripts/generate-inventory.mjs",
-    "inventory:check": "node scripts/generate-inventory.mjs --check"
+    "inventory:check": "node scripts/generate-inventory.mjs --check",
+    "identity": "node packages/identity/dist/cli.js"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

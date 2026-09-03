@@ -7,6 +7,7 @@
     { "path": "packages/safety" },
     { "path": "packages/cost-ledger" },
     { "path": "packages/audit" },
+    { "path": "packages/identity" },
     { "path": "apps/api" },
     { "path": "apps/worker" },
     { "path": "apps/sandbox" }

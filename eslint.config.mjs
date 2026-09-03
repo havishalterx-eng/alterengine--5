@@ -33,6 +33,13 @@ export default tseslint.config(
     rules: { 'no-console': 'off', 'no-undef': 'off' },
   },
   {
+    // Component CLIs (like identity's step-1 terminal surface) are the same
+    // shape: programs whose product IS their stdout, read by a person.
+    files: ['packages/*/src/cli.ts'],
+    languageOptions: { globals: globals.node },
+    rules: { 'no-console': 'off' },
+  },
+  {
     files: ['**/*.ts'],
     languageOptions: { globals: globals.node },
   },
