@@ -365,3 +365,21 @@ Continuing to send back one-finding-at-a-time patches would very likely produce 
 **VERDICT: APPROVE.**
 
 **Decided by:** Claude as CEO, performing the Adversary's verification directly at Havish's explicit instruction.
+
+---
+
+## 2026-09-03 — PR #7 (component 42) rejected; RLS decision made
+
+**Decision:** PR #7 not merged. One defect found by independent verification, not covered by the builder's own done gate. RLS question the builder explicitly asked for is decided: table-level RLS with FORCE is added now, on the tables this component creates; the enforcement TEST is deferred to step 2, because per-request tenant context is component 1's to supply and a local Postgres superuser bypasses RLS regardless.
+
+**The defect:** `transferOwnership` updates only `accounts.owner_user_id`. It does not create a membership row for the successor. `createAccount` deliberately gives its founder BOTH `owner_user_id` and an Admin membership — the store's own comment says so — but `transferOwnership` does not mirror that.
+
+The result, reproduced against real Postgres: transfer ownership to a user who has never been a member of the account, and `resolvePermissions()` returns `null` — indistinguishable from "not a member" — while `can()` for an owner-only action correctly returns `true` via its independent `owner_user_id` fallback. The new owner can perform owner-only actions one at a time through `can()`, but cannot see their own permission set, cannot create a workflow, cannot invite anyone. The CLI's `member show`, which is the physical test for this whole step, would report them as not found.
+
+**Why this was not caught by the builder's own done gate.** Item 2 states "Owner: yes. Transfer moves them" — but that was tested by transferring ownership to a user who was already a member (an Admin, per the physical-test transcript). The untested path is a transfer to a genuine non-member, which is not a hypothetical: it is the shape of the very attack the AGENTS.md rules ask every reviewer to consider.
+
+**RLS decision:** add RLS with FORCE to `accounts`, `memberships`, and `custom_roles` now. The Rules doc calls out RLS-with-FORCE as something the previous build got right and worth carrying forward; deferring it entirely to "when component 1 exists" risks it being retrofitted onto live tables later, which is exactly the failure mode rule 20's registration gate exists to prevent for a different resource. The enforcement test genuinely cannot be meaningful until component 1 supplies real per-request tenant context — that half is deferred, not the policies themselves.
+
+**Not flagged, checked and found clean:** custom-role isolation is real SQL-level scoping (`WHERE account_id = $1`), not an application-level filter; the `no-console` eslint carve-out is scoped exactly to `packages/*/src/cli.ts`, matching the existing `scripts/**` precedent.
+
+**Decided by:** Claude as CEO, performing the Adversary's verification directly at Havish's explicit instruction — the tool was unavailable.
