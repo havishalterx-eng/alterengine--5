@@ -12,14 +12,17 @@ import type { JsonObject } from '@alter/safety';
 export const OBSERVABILITY_SCHEMA_VERSION = 1;
 
 /**
- * Cost encoding decision (Adversary finding 3): cost is carried as a decimal
- * STRING of minor units, e.g. `costMinorUnits: '17000'`.
- *
- * Why: JSON has no bigint, a number loses integer precision past 2^53 minor
- * units, and telemetry must survive `JSON.stringify` without a runtime drop.
- * A string carries the exact integer; Cost Ledger parses it back with
- * `BigInt()`. Never emit cost as bigint or float.
- */
+  * Cost encoding decision (Adversary finding 3): cost is carried as a decimal
+  * STRING of minor units, e.g. `costMinorUnits: '17000'`.
+  *
+  * Why: JSON has no bigint, a number loses integer precision past 2^53 minor
+  * units, and telemetry must survive `JSON.stringify` without a runtime drop.
+  * A string carries the exact integer. Never emit cost as bigint or float.
+  *
+  * No consumer parses this back yet. Model Gateway, the real reader, arrives
+  * in Phase 2; until then the only proof of the encoding is the round-trip
+  * test in observability.test.ts (bigint in, `BigInt(string)` out, equal).
+  */
 
 export interface TenantAttribution {
   readonly scope: 'tenant';
@@ -68,11 +71,31 @@ interface ObservabilityRecordBase {
 export type ObservabilityRecord = ObservabilityRecordBase & ObservabilityAttribution;
 
 /**
- * A value is JSON-safe if JSON.stringify cannot mangle or drop it:
- * bigint, symbol, function, undefined, non-finite numbers and cycles are not.
+ * A value is JSON-safe if JSON.stringify cannot mangle or drop it: bigint,
+ * symbol, function, undefined, non-finite numbers, cycles, and anything that
+ * is not a PLAIN object or array are not.
+ *
+ * The plain-object rule closed the hole the compile-time fix could not see
+ * (Adversary finding 1 on PR #5): a Map, a Set, or a class instance passes
+ * `typeof value === 'object'`, survives Object.values recursion (its own
+ * enumerable properties are empty or incidental), and then JSON.stringify
+ * silently emits `{}` — data gone, nothing reported. Only a prototype of
+ * Object.prototype or null serialises predictably.
+ *
+ * This deliberately REJECTS values JSON.stringify can handle, like Date (it
+ * stringifies to ISO form). Parity with the type level is the rule: JsonObject
+ * has no Date, so a dynamically-built record carrying one is a validation
+ * failure, not a silent conversion. A producer who wants an ISO timestamp
+ * encodes it as a string.
+ *
  * Cycles are tracked with a seen-set, so a circular payload is reported as a
  * validation failure instead of overflowing the stack.
  */
+function isPlainObject(value: object): boolean {
+  const prototype = Object.getPrototypeOf(value);
+  return prototype === Object.prototype || prototype === null;
+}
+
 function isJsonSafe(value: unknown, seen: ReadonlySet<object>): boolean {
   if (
     value === null ||
@@ -100,8 +123,13 @@ function isJsonSafe(value: unknown, seen: ReadonlySet<object>): boolean {
   }
   const nextSeen = new Set(seen);
   nextSeen.add(value);
-  const children = Array.isArray(value) ? value : Object.values(value);
-  return children.every((child) => isJsonSafe(child, nextSeen));
+  if (Array.isArray(value)) {
+    return value.every((child) => isJsonSafe(child, nextSeen));
+  }
+  if (!isPlainObject(value)) {
+    return false;
+  }
+  return Object.values(value).every((child) => isJsonSafe(child, nextSeen));
 }
 
 const jsonSafePayload = z
@@ -114,7 +142,8 @@ const jsonSafePayload = z
           path: [key],
           message:
             `payload.${key} cannot survive JSON serialisation ` +
-            '(bigint, symbol, function, undefined, non-finite number, or cycle)',
+            '(bigint, symbol, function, undefined, non-finite number, cycle, ' +
+            'or a non-plain object such as Map, Set, Date or a class instance)',
         });
       }
     }

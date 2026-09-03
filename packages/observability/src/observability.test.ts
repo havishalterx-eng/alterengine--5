@@ -94,6 +94,80 @@ describe('36.1 — typed, versioned, JSON-safe schema (done gate 1, finding 3)',
     ).toBe(false);
   });
 
+  it('rejects a Map payload — the Adversary repro, not a silent {}', () => {
+    // PR #5 finding 1: a Map passed the old validator (Object.values on a Map
+    // is empty), reached the sink, and JSON.stringify silently emitted {}.
+    const result = observabilityRecordSchema.safeParse({
+      ...tenantRecord,
+      payload: { cost: new Map([['minorUnits', '17']]) },
+    });
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.issues[0]?.message).toContain(
+        'cannot survive JSON serialisation',
+      );
+    }
+  });
+
+  it('rejects a Set and a class instance — same hole, same rule', () => {
+    class Money {
+      public constructor(public readonly minorUnits: string) {}
+    }
+    for (const bad of [new Set(['a']), new Money('17')]) {
+      expect(
+        observabilityRecordSchema.safeParse({
+          ...tenantRecord,
+          payload: { cost: bad },
+        }).success,
+        `${bad.constructor.name} must not parse`,
+      ).toBe(false);
+    }
+  });
+
+  it('rejects a Map nested inside a plain object, and one inside an array', () => {
+    const nested = { totals: { cost: new Map() } };
+    const inArray = { entries: [new Set(['x'])] };
+    expect(
+      observabilityRecordSchema.safeParse({ ...tenantRecord, payload: nested })
+        .success,
+    ).toBe(false);
+    expect(
+      observabilityRecordSchema.safeParse({ ...tenantRecord, payload: inArray })
+        .success,
+    ).toBe(false);
+  });
+
+  it('rejects a Date — parity with the type level, no silent ISO conversion', () => {
+    // JSON.stringify would emit an ISO string predictably, but JsonObject has
+    // no Date. A dynamically-built record carrying one is a validation
+    // failure; a producer who wants an ISO timestamp encodes a string.
+    expect(
+      observabilityRecordSchema.safeParse({
+        ...tenantRecord,
+        payload: { at: new Date('2026-09-03T00:00:00Z') },
+      }).success,
+    ).toBe(false);
+  });
+
+  it('cost encoding round-trip: bigint in, decimal string, BigInt() out, equal', () => {
+    // The encoding decision in schema.ts, proven rather than asserted: a
+    // producer holding 17n minor units emits '17', and parsing it back with
+    // BigInt() reconstructs the exact integer. No consumer reads cost records
+    // yet — Model Gateway arrives in Phase 2 — so this test is the guarantee
+    // the encoding does not lose anything in the meantime.
+    const minorUnits = 17n;
+    const encoded: ObservabilityRecord = {
+      ...tenantRecord,
+      payload: { costMinorUnits: minorUnits.toString() },
+    };
+    const parsed = observabilityRecordSchema.parse(encoded);
+    const value = parsed.payload.costMinorUnits;
+    expect(typeof value).toBe('string');
+    if (typeof value === 'string') {
+      expect(BigInt(value)).toBe(minorUnits);
+    }
+  });
+
   it('rejects a missing attribution field on a tenant record (shape, not values)', () => {
     const cases: Record<string, unknown>[] = [];
     for (const field of ['runId', 'nodeId', 'component', 'tenantId'] as const) {
