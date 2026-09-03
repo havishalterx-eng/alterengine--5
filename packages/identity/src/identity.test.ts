@@ -138,6 +138,76 @@ describe('done gate 2 — Admin cannot perform an owner-only action', () => {
     await store.transferOwnership({ accountId: account.accountId, toEmail: `new-owner@handover.test` });
     expect(await store.can(account.accountId, successor.userId, 'manage_billing')).toBe(true);
   });
+
+  it('transfer to a genuine non-member leaves the successor with functioning access (PR #7 defect)', async () => {
+    // The rejected path: the successor is a real user of a DIFFERENT tenant
+    // and not a member of this one at all. Before the fix, ownership moved
+    // but no membership existed — resolvePermissions() returned null
+    // (indistinguishable from "not a member") while can() granted
+    // owner-only actions one at a time. The new owner owned an account they
+    // could not use.
+    const name = `rescue-${crypto.randomUUID().slice(0, 8)}`;
+    const account = await store.createAccount({ name, ownerEmail: `founder@${name}.test` });
+    const oldOwner = await store.findUserByEmail(`founder@${name}.test`);
+    if (oldOwner === null) throw new Error('founder fixture missing');
+
+    // The successor exists — as the owner of an unrelated tenant.
+    await store.createAccount({
+      name: `${name}-unrelated`,
+      ownerEmail: `successor@${name}.test`,
+    });
+
+    await store.transferOwnership({
+      accountId: account.accountId,
+      toEmail: `successor@${name}.test`,
+    });
+    const successor = await store.findUserByEmail(`successor@${name}.test`);
+    if (successor === null) throw new Error('successor fixture missing');
+
+    // The exact broken assertions, now fixed: a real permission set, not
+    // null, and day-to-day capability through it.
+    const resolved = await store.resolvePermissions({
+      accountId: account.accountId,
+      userId: successor.userId,
+    });
+    expect(resolved).not.toBeNull();
+    expect(resolved?.isOwner).toBe(true);
+    expect(resolved?.permissions.length).toBe(10);
+    expect(await store.can(account.accountId, successor.userId, 'create_workflow')).toBe(true);
+    expect(await store.can(account.accountId, successor.userId, 'manage_billing')).toBe(true);
+
+    // The previous owner keeps their Admin membership (deliberately not
+    // removed) and loses owner-only actions.
+    const oldOwnerAfter = await store.resolvePermissions({
+      accountId: account.accountId,
+      userId: oldOwner.userId,
+    });
+    expect(oldOwnerAfter?.isOwner).toBe(false);
+    expect(oldOwnerAfter?.permissions.length).toBe(10);
+    expect(await store.can(account.accountId, oldOwner.userId, 'manage_billing')).toBe(false);
+  });
+
+  it('transfer to a brand-new email creates the user with functioning access', async () => {
+    // The other realistic transfer: the successor has never appeared in the
+    // system at all.
+    const name = `fresh-${crypto.randomUUID().slice(0, 8)}`;
+    const account = await store.createAccount({ name, ownerEmail: `founder@${name}.test` });
+
+    await store.transferOwnership({
+      accountId: account.accountId,
+      toEmail: `brand-new-person@${name}.test`,
+    });
+    const successor = await store.findUserByEmail(`brand-new-person@${name}.test`);
+    if (successor === null) throw new Error('successor was not created');
+
+    const resolved = await store.resolvePermissions({
+      accountId: account.accountId,
+      userId: successor.userId,
+    });
+    expect(resolved?.isOwner).toBe(true);
+    expect(resolved?.permissions.length).toBe(10);
+    expect(await store.can(account.accountId, successor.userId, 'create_workflow')).toBe(true);
+  });
 });
 
 describe('done gate 3 — a custom role is invisible to another tenant', () => {
@@ -292,6 +362,49 @@ describe('fail-closed resolution', () => {
     expect(
       await store.resolvePermissions({ accountId: outsider.accountId, userId: otherOwner.userId }),
     ).toBeNull();
+  });
+});
+
+describe('RLS policies exist — enforcement unproven until component 1 (step 2)', () => {
+  it('accounts, memberships and custom_roles carry FORCE row-level security', async () => {
+    // What IS provable today: the policies exist on the live schema with
+    // FORCE. What is NOT provable, and must not be implied: that they block
+    // anything — the local Postgres connects as a superuser (bypasses RLS),
+    // and no per-request tenant context exists until component 1. Step 2
+    // owes the enforcement proof against a non-superuser connection.
+    const client = new Client({ connectionString: loadConfig(process.env).databaseUrl });
+    await client.connect();
+    try {
+      const tables = await client.query<{
+        readonly relname: string;
+        readonly relrowsecurity: boolean;
+        readonly relforcerowsecurity: boolean;
+      }>(
+        `SELECT c.relname, c.relrowsecurity, c.relforcerowsecurity
+         FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
+         WHERE n.nspname = 'public' AND c.relname IN ('accounts', 'memberships', 'custom_roles')
+         ORDER BY c.relname`,
+      );
+      expect(tables.rows).toEqual([
+        { relname: 'accounts', relrowsecurity: true, relforcerowsecurity: true },
+        { relname: 'custom_roles', relrowsecurity: true, relforcerowsecurity: true },
+        { relname: 'memberships', relrowsecurity: true, relforcerowsecurity: true },
+      ]);
+
+      const policies = await client.query<{ readonly tablename: string; readonly policyname: string }>(
+        `SELECT tablename, policyname FROM pg_policies
+         WHERE schemaname = 'public' AND tablename IN ('accounts', 'memberships', 'custom_roles')
+         ORDER BY tablename`,
+      );
+      expect(policies.rows.map((row) => row.tablename)).toEqual([
+        'accounts',
+        'custom_roles',
+        'memberships',
+      ]);
+      for (const row of policies.rows) expect(row.policyname).toBe('tenant_isolation');
+    } finally {
+      await client.end();
+    }
   });
 });
 

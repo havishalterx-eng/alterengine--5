@@ -48,3 +48,40 @@ CREATE TABLE IF NOT EXISTS custom_roles (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   UNIQUE (account_id, name)
 );
+
+-- Row-level security with FORCE, per the CEO decision on PR #7.
+--
+-- WRITTEN GAP, do not read this as closed: enforcement is UNPROVEN today
+-- and cannot be proven until component 1 (step 2) supplies real
+-- per-request tenant context — and the local development Postgres connects
+-- as a superuser, which bypasses RLS regardless of what policies exist.
+-- A test asserting these policies block anything would pass vacuously
+-- right now. The policies are here so the shape is right from the first
+-- migration; step 2 must prove them against a non-superuser connection.
+--
+-- Fail-closed by construction: with app.current_account unset (the
+-- situation until component 1 exists), current_setting(..., true) is NULL,
+-- every comparison is NULL, and NO rows are visible. Nobody sees tenant
+-- data by forgetting to set the context.
+--
+-- users is deliberately NOT covered: it is cross-tenant by design (one
+-- person, memberships in many tenants), reported in the step-1 notes and
+-- confirmed by the CEO's list.
+
+ALTER TABLE accounts ENABLE ROW LEVEL SECURITY;
+ALTER TABLE accounts FORCE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS tenant_isolation ON accounts;
+CREATE POLICY tenant_isolation ON accounts
+  USING (id = current_setting('app.current_account', true)::uuid);
+
+ALTER TABLE memberships ENABLE ROW LEVEL SECURITY;
+ALTER TABLE memberships FORCE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS tenant_isolation ON memberships;
+CREATE POLICY tenant_isolation ON memberships
+  USING (account_id = current_setting('app.current_account', true)::uuid);
+
+ALTER TABLE custom_roles ENABLE ROW LEVEL SECURITY;
+ALTER TABLE custom_roles FORCE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS tenant_isolation ON custom_roles;
+CREATE POLICY tenant_isolation ON custom_roles
+  USING (account_id = current_setting('app.current_account', true)::uuid);

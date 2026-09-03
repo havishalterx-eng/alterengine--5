@@ -1,5 +1,5 @@
 import { readFile } from 'node:fs/promises';
-import { Pool, type QueryResultRow } from 'pg';
+import { Pool, type PoolClient, type QueryResultRow } from 'pg';
 import {
   PERMISSION_TOGGLES,
   PREDEFINED_ROLES,
@@ -200,13 +200,54 @@ export function createIdentityStore({ databaseUrl }: { readonly databaseUrl: str
     transferOwnership: async ({ accountId, toEmail }) => {
       // Explicit and deliberate: the only path that moves owner-only
       // actions, and it names the successor by their email.
-      const successor = await findUser(pool, toEmail);
-      if (successor === null) throw new NotAMemberError(toEmail, accountId);
-      const updated = await pool.query(
-        'UPDATE accounts SET owner_user_id = $1 WHERE id = $2 RETURNING id',
-        [successor.userId, accountId],
-      );
-      if (updated.rowCount === 0) throw new NotAMemberError(toEmail, accountId);
+      //
+      // The successor may be a genuine non-member — the realistic transfer,
+      // to someone outside the existing team. createAccount gives its
+      // founder owner_user_id AND an Admin membership; the transfer must
+      // land the successor with functioning access the same way, or they
+      // own an account they cannot use: resolvePermissions() would return
+      // null (indistinguishable from "not a member") while can() granted
+      // owner-only actions one at a time through the owner fallback.
+      //
+      // One transaction: owner_user_id and the membership row change
+      // together or not at all — no window where ownership has moved but
+      // membership has not caught up. The previous owner's own Admin
+      // membership is untouched.
+      const client = await pool.connect();
+      try {
+        await client.query('BEGIN');
+
+        let successorId = await userIdByEmail(client, toEmail);
+        if (successorId === null) {
+          successorId = crypto.randomUUID();
+          await client.query('INSERT INTO users (id, email) VALUES ($1, $2)', [
+            successorId,
+            toEmail,
+          ]);
+        }
+
+        const updated = await client.query(
+          'UPDATE accounts SET owner_user_id = $1 WHERE id = $2 RETURNING id',
+          [successorId, accountId],
+        );
+        if (updated.rowCount === 0) {
+          await client.query('ROLLBACK');
+          throw new NotAMemberError(toEmail, accountId);
+        }
+
+        await client.query(
+          'INSERT INTO memberships (id, account_id, user_id, role_name) VALUES ($1, $2, $3, $4) ' +
+            'ON CONFLICT (account_id, user_id) DO UPDATE SET role_name = EXCLUDED.role_name',
+          [crypto.randomUUID(), accountId, successorId, 'Admin'],
+        );
+
+        await client.query('COMMIT');
+      } catch (error) {
+        await client.query('ROLLBACK').catch(() => undefined);
+        throw error;
+      } finally {
+        client.release();
+      }
     },
 
     resolvePermissions: async ({ accountId, userId }) => {
@@ -271,6 +312,11 @@ async function findUser(pool: Pool, email: string): Promise<UserRef | null> {
   const result = await pool.query<UserRow>('SELECT id, email FROM users WHERE email = $1', [email]);
   const row = result.rows[0];
   return row === undefined ? null : { userId: row.id, email: row.email };
+}
+
+async function userIdByEmail(client: PoolClient, email: string): Promise<string | null> {
+  const result = await client.query<UserRow>('SELECT id, email FROM users WHERE email = $1', [email]);
+  return result.rows[0]?.id ?? null;
 }
 
 /**
