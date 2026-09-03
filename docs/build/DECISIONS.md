@@ -308,3 +308,17 @@ All are marked **PARTIAL**, never REAL. Each satisfies its Phase 1 half and carr
 **This is the process working as designed, not a setback.** The CEO does not verify or fix builder reports directly — that collapsed build and check into one point of failure on the previous task. Sending it back to the builder, with the Adversary's exact repro steps, is the correct response to a REJECT.
 
 **Decided by:** Claude as CEO, on the Adversary's verdict.
+
+---
+
+## 2026-09-03 — PR #5, third REJECT: escalated from patching to replacing
+
+**Decision:** four new findings on round 2, all real, all the same defect class as round 1 — a value slipping past a runtime JSON-safety check that was never exhaustive. Not sent back as another individual patch. The builder is told to replace `isJsonSafe` with a descriptor-based recursive validator and prove exhaustiveness with an adversarial test suite it writes itself.
+
+**Reasoning:** the pattern across three rounds is diagnostic, not coincidental. Round 1: `Map` slips past `Object.values`. Round 2, after that specific fix: Symbol keys, sparse arrays, extra array properties, and a throwing getter — four more ways past the same `Object.values()` / `.every()` shape. Each round fixed exactly the case demonstrated and left the mechanism itself unchanged, because iterating with those two methods was never going to be exhaustive; they were built to walk normal data, not to certify the absence of abnormal data.
+
+Continuing to send back one-finding-at-a-time patches would very likely produce a fourth review finding a sixth hole — a Proxy, a getter defined via `Reflect.defineProperty` after construction, a frozen object containing one of the earlier cases nested. The fix is architectural: never read a property's value until its descriptor is confirmed to be a plain enumerable data property. That single rule closes the getter-throws finding directly and makes the Symbol and sparse-array findings fall out as a consequence, rather than requiring their own special case.
+
+**The builder is asked to prove exhaustiveness itself**, with cases beyond what the Adversary has already tried, rather than the CEO or Adversary continuing to be the only source of new failing inputs. Finding new cases is the actual evidence the approach generalises.
+
+**Decided by:** Claude as CEO, on three consecutive Adversary verdicts.
