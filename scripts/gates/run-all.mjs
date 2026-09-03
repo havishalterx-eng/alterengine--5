@@ -18,6 +18,7 @@ import * as driverExistence from './driver-existence.mjs';
 import * as duplicatePrimitive from './duplicate-primitive.mjs';
 import * as mockReachability from './mock-reachability.mjs';
 import * as safetyDuplicate from './safety-duplicate.mjs';
+import * as testEnvFile from './test-env-file.mjs';
 import * as unsafeDefault from './unsafe-default.mjs';
 import * as verifierDriver from './verifier-driver.mjs';
 
@@ -32,6 +33,7 @@ const GATES = [
   capabilityCoverage,
   verifierDriver,
   deletionSchema,
+  testEnvFile,
 ];
 
 const mode = process.env['GATE_MODE'] === 'fail' ? 'fail' : 'warn';

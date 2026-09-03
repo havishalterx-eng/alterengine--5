@@ -13,12 +13,58 @@
  */
 
 import type { AuditStore } from '@alter/audit';
+import type { JsonObject } from '@alter/safety';
+import { type ObservabilityRecord, type Observer } from '@alter/observability';
 
 export class AuditRetentionSweeper {
-  constructor(private readonly store: AuditStore) {}
+  constructor(
+    private readonly store: AuditStore,
+    private readonly observer: Observer,
+  ) {}
 
   /** One scheduled run. Returns the number of skeletons destroyed. */
   async tick(): Promise<number> {
-    return this.store.destroyExpiredSkeletons();
+    const startedAt = Date.now();
+    this.observer.emit(record('audit.retention.tick.started', {}));
+    try {
+      const destroyed = await this.store.destroyExpiredSkeletons();
+      this.observer.emit(
+        record('audit.retention.tick.finished', {
+          destroyed,
+          durationMs: Date.now() - startedAt,
+          outcome: 'completed',
+        }),
+      );
+      return destroyed;
+    } catch (error) {
+      this.observer.emit(
+        record('audit.retention.tick.finished', {
+          durationMs: Date.now() - startedAt,
+          error: errorMessage(error),
+          outcome: 'error',
+        }),
+      );
+      throw error;
+    }
   }
+}
+
+/**
+ * A system record carries driver identity, never run identity (Adversary
+ * finding 4). See the matching comment in audit-verifier-scheduler.ts.
+ */
+function record(name: string, payload: JsonObject): ObservabilityRecord {
+  return {
+    component: '38',
+    driver: 'audit-retention-sweeper',
+    kind: 'event',
+    name,
+    payload,
+    schemaVersion: 1,
+    scope: 'system',
+  };
+}
+
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : 'unknown error';
 }

@@ -1,7 +1,5 @@
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
-import { existsSync } from 'node:fs';
 import { Client } from 'pg';
+import { loadConfig } from '@alter/contracts';
 import { beforeAll, afterAll, describe, expect, it } from 'vitest';
 import {
   tenantDataDeclarations,
@@ -22,17 +20,10 @@ import {
  * Postgres on 5440, in Builder B's own database (alter_builder_b).
  */
 
-const dirname = path.dirname(fileURLToPath(import.meta.url));
-const envPath = path.join(dirname, '../../../.env');
-if (existsSync(envPath)) {
-  process.loadEnvFile(envPath);
-}
-
-const connectionString = process.env.DATABASE_URL;
-if (connectionString === undefined) {
-  // Fail closed (rule 7): an unconfigured test is an error, not a skip.
-  throw new Error('DATABASE_URL is not set; cannot verify against real Postgres');
-}
+// One path. vitest.config.ts loads .env when one exists; CI exports the same
+// variables with no file present. loadConfig fails closed on a missing
+// setting, so an unconfigured test is an error rather than a silent skip.
+const connectionString = loadConfig(process.env).databaseUrl;
 
 let client: Client;
 

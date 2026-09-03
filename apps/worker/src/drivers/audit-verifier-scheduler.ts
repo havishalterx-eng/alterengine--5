@@ -1,6 +1,8 @@
 import type {
   AuditAlertSink,
   AuditChainVerifier} from '@alter/audit';
+import type { JsonObject } from '@alter/safety';
+import { type ObservabilityRecord, type Observer } from '@alter/observability';
 import {
   type VerificationResult,
 } from '@alter/audit';
@@ -20,6 +22,7 @@ export class AuditVerifierScheduler {
   constructor(
     private readonly verifier: AuditChainVerifier,
     private readonly alerts: AuditAlertSink,
+    private readonly observer: Observer,
   ) {}
 
   /**
@@ -28,10 +31,54 @@ export class AuditVerifierScheduler {
    * it.
    */
   async tick(): Promise<VerificationResult> {
-    const result = await this.verifier.verify();
-    if (!result.valid) {
-      await this.alerts.raise('verification_failed', result.issues);
+    const startedAt = Date.now();
+    this.observer.emit(record('audit.verification.tick.started', {}));
+
+    try {
+      const result = await this.verifier.verify();
+      if (!result.valid) {
+        await this.alerts.raise('verification_failed', result.issues);
+      }
+      this.observer.emit(
+        record('audit.verification.tick.finished', {
+          durationMs: Date.now() - startedAt,
+          issueCount: result.issues.length,
+          issueTypes: result.issues.map((issue) => issue.type),
+          outcome: result.valid ? 'valid' : 'invalid',
+        }),
+      );
+      return result;
+    } catch (error) {
+      this.observer.emit(
+        record('audit.verification.tick.finished', {
+          durationMs: Date.now() - startedAt,
+          error: errorMessage(error),
+          outcome: 'error',
+        }),
+      );
+      throw error;
     }
-    return result;
   }
+}
+
+/**
+ * A system record carries driver identity, never run identity (Adversary
+ * finding 4). `runId: 'system:worker'` fabricated a run that Run Monitor
+ * would have listed as real; this record cannot name a run at all — the type
+ * has no field for it and the schema rejects the key.
+ */
+function record(name: string, payload: JsonObject): ObservabilityRecord {
+  return {
+    component: '38',
+    driver: 'audit-verifier-scheduler',
+    kind: 'event',
+    name,
+    payload,
+    schemaVersion: 1,
+    scope: 'system',
+  };
+}
+
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : 'unknown error';
 }

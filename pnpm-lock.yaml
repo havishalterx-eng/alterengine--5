@@ -56,6 +56,12 @@ importers:
       '@alter/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
+      '@alter/observability':
+        specifier: workspace:*
+        version: link:../../packages/observability
+      '@alter/safety':
+        specifier: workspace:*
+        version: link:../../packages/safety
 
   packages/audit:
     dependencies:
@@ -78,6 +84,9 @@ importers:
 
   packages/cost-ledger:
     dependencies:
+      '@alter/contracts':
+        specifier: workspace:*
+        version: link:../contracts
       pg:
         specifier: ^8.23.0
         version: 8.23.0
@@ -88,12 +97,18 @@ importers:
 
   packages/deletion-registry:
     dependencies:
+      '@alter/contracts':
+        specifier: workspace:*
+        version: link:../contracts
       pg:
         specifier: ^8.16.0
         version: 8.23.0
 
   packages/observability:
     dependencies:
+      '@alter/safety':
+        specifier: workspace:*
+        version: link:../safety
       zod:
         specifier: ^4.5.4
         version: 4.5.4
