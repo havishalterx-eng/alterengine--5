@@ -4,7 +4,7 @@
 
 Full reasoning per step: [`SEQUENTIAL-BUILD-ORDER.md`](SEQUENTIAL-BUILD-ORDER.md). Method: [`METHOD.md`](METHOD.md).
 
-**Progress: 6 of 55 components merged. 0 of 49 steps done.**
+**Progress: 7 of 55 components merged. 1 of 49 steps done.**
 
 ---
 
@@ -24,7 +24,7 @@ Full reasoning per step: [`SEQUENTIAL-BUILD-ORDER.md`](SEQUENTIAL-BUILD-ORDER.md
 
 Hand-write a DAG and run it. The design path comes later, on purpose.
 
-- [ ] **1** · 42 Identity & Membership — create an account and member, query the role back · *terminal*
+- [x] **1** · 42 Identity & Membership — create an account and member, query the role back · *terminal* — merged 6218f96
 - [ ] **2** · 1 Identity & Tenant Gateway — a member resolves to a non-empty permission set; another tenant's member gets nothing · *terminal*
 - [ ] **3** · 48 Platform API + **console shell** — log in, see your account, see a genuine 501 disabled state on an unbuilt capability
 - [ ] **4** · 19 Durable Substrate — start a workflow, watch it complete in the Temporal UI on `:8240`
