@@ -2,7 +2,7 @@
 
 Takes a business problem, decides what system should exist to solve it, builds and runs that system durably, verifies the real-world outcome, repairs failures at the smallest broken layer, and learns safely — without a human hand-designing the workflow.
 
-**Status: Phase 0 closed, Phase 1 not started.** Toolchain, dependency stack, CI and five architecture gates are up and verified by execution. No components built yet.
+**Status: Phase 1 closed.** Six components merged, all PARTIAL. Ten architecture gates failing rather than warning. 92 tests against real Postgres, Redis and Temporal.
 
 ---
 
@@ -24,9 +24,8 @@ Then your role brief in [`docs/roles/`](docs/roles/), then [`docs/build/STATUS.m
 | [`docs/build/STATUS.md`](docs/build/STATUS.md) | **Single source of truth for progress** |
 | [`docs/build/DECISIONS.md`](docs/build/DECISIONS.md) | Append-only decision log |
 | [`docs/build/build-order.md`](docs/build/build-order.md) | Eight phases, waves, role assignments |
-| [`docs/build/SESSION-SETUP.md`](docs/build/SESSION-SETUP.md) | **Paste-ready session blocks.** Start here to launch |
-| [`docs/build/AGENT-ROSTER.md`](docs/build/AGENT-ROSTER.md) | Who runs where, on what model, and why |
-| [`docs/build/LAUNCH-BRIEFS.md`](docs/build/LAUNCH-BRIEFS.md) | Opener, task format, echo check, worktrees |
+| [`docs/build/METHOD.md`](docs/build/METHOD.md) | **How this build runs.** Read before anything else |
+| `docs/build/AGENT-ROSTER.md`, `SESSION-SETUP.md`, `LAUNCH-BRIEFS.md` | Superseded. Kept as the record of how Phase 1 was produced |
 | [`docs/architecture/contracts.md`](docs/architecture/contracts.md) | All 55 component contracts |
 | [`docs/architecture/whole.md`](docs/architecture/whole.md) | The engine as one system |
 | [`docs/architecture/layers.md`](docs/architecture/layers.md) | L1–L8 composition |
