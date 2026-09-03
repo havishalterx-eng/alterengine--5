@@ -41,6 +41,30 @@ export const tenantDataDeclarations: readonly TenantDataDeclaration[] = [
     component: 38,
     owner: 'Builder C',
   },
+  {
+    schema: 'public',
+    table: 'accounts',
+    component: 42,
+    owner: 'Builder A',
+  },
+  {
+    schema: 'public',
+    table: 'users',
+    component: 42,
+    owner: 'Builder A',
+  },
+  {
+    schema: 'public',
+    table: 'memberships',
+    component: 42,
+    owner: 'Builder A',
+  },
+  {
+    schema: 'public',
+    table: 'custom_roles',
+    component: 42,
+    owner: 'Builder A',
+  },
 ];
 
 export const tenantDataExemptions: readonly TenantDataExemption[] = [

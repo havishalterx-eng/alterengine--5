@@ -104,6 +104,22 @@ importers:
         specifier: ^8.16.0
         version: 8.23.0
 
+  packages/identity:
+    dependencies:
+      '@alter/contracts':
+        specifier: workspace:*
+        version: link:../contracts
+      '@alter/deletion-registry':
+        specifier: workspace:*
+        version: link:../deletion-registry
+      pg:
+        specifier: ^8.13.1
+        version: 8.23.0
+    devDependencies:
+      '@types/pg':
+        specifier: ^8.11.10
+        version: 8.23.1
+
   packages/observability:
     dependencies:
       '@alter/safety':
