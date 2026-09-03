@@ -23,6 +23,8 @@ const DRIVER_VERIFIER = 'audit-verifier-scheduler';
 const DRIVER_SWEEPER = 'audit-retention-sweeper';
 
 let store: AuditStore;
+/** Set only when beforeAll succeeded; afterAll must not TypeError when it did not. */
+let storeReady = false;
 let scheduler: AuditVerifierScheduler;
 let sweeper: AuditRetentionSweeper;
 
@@ -36,6 +38,7 @@ function databaseUrl(): string {
 beforeAll(async () => {
   store = new AuditStore({ connectionString: databaseUrl() });
   await store.ensureSchema();
+  storeReady = true;
   await store.pool.query('TRUNCATE audit_events, audit_alerts RESTART IDENTITY CASCADE');
   const verifier = new AuditChainVerifier(store);
   const alerts = new AuditAlertSink(store.pool);
@@ -45,7 +48,10 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
-  await store.close();
+  // If beforeAll failed — e.g. missing configuration, which loadConfig reports
+  // with a clear message — teardown must not bury it under "Cannot read
+  // properties of undefined (reading 'close')".
+  if (storeReady) await store.close();
 });
 
 describe('audit drivers exist (done-gate item 1)', () => {

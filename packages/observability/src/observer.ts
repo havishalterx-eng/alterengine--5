@@ -48,22 +48,28 @@ interface ObserverOptions {
 }
 
 /**
- * Composition-root observer. The only way a record reaches a sink.
- * Fail-open: sink errors are logged loudly and never propagate.
- */
-/**
  * What a consumer holds.
  *
  * Exported because the first real consumer had to write
  * `Pick<ReturnType<typeof createObserver>, 'emit'>` to inject an observer,
- * and every consumer after it would have written the same thing or invented
- * a different shape. Rule 18: one definition per shared primitive, and the
+ * and every consumer after it would have written the same thing or invented a
+ * different shape. Rule 18: one definition per shared primitive, and the
  * definition belongs here rather than being reconstructed at each call site.
  */
 export interface Observer {
-  emit(record: unknown): void;
+  /**
+   * Typed, JSON-safe input (Adversary finding 3): a record carrying a bigint
+   * or any other unserialisable value does not typecheck. The runtime schema
+   * check remains as defence for dynamically-built records, and a failure
+   * there is loud, not a silent drop.
+   */
+  emit(record: ObservabilityRecord): void;
 }
 
+/**
+ * Composition-root observer. The only way a record reaches a sink.
+ * Fail-open: sink errors are logged loudly and never propagate.
+ */
 export function createObserver(options: ObserverOptions): Observer {
   const redactor = options.redactor;
   const reportFailure =
@@ -96,19 +102,19 @@ export function createObserver(options: ObserverOptions): Observer {
   };
 
   return {
-    emit(record: unknown) {
-      // A malformed record must not break the run it is describing. The
-      // Adversary found this threw ZodError into the caller.
+    emit(record: ObservabilityRecord) {
+      // A malformed record must not break the run it is describing. The input
+      // is typed, but records can be assembled dynamically, so the schema is
+      // still enforced at runtime — loudly, never as a silent drop.
       const parsed = observabilityRecordSchema.safeParse(record);
       if (!parsed.success) {
         onSinkError(parsed.error, record);
         return;
       }
-      const validated = parsed.data;
 
       let redacted: ObservabilityRecord;
       try {
-        const payload = redactor(validated.payload) as unknown;
+        const payload = redactor(record.payload);
 
         // A redactor returning a promise would put that promise in the record
         // and leave its rejection unhandled. Redaction is synchronous by
@@ -117,16 +123,16 @@ export function createObserver(options: ObserverOptions): Observer {
           payload.then(undefined, () => {});
           onSinkError(
             new Error('redactor returned a promise; redaction must be synchronous'),
-            validated,
+            record,
           );
           return;
         }
 
-        redacted = { ...validated, payload: payload as ObservabilityRecord['payload'] };
+        redacted = { ...record, payload };
       } catch (error) {
         // Fail-CLOSED for the record: never send an unredacted payload to a
         // sink. The run survives, the record is dropped, the failure is loud.
-        onSinkError(error, validated);
+        onSinkError(error, record);
         return;
       }
 

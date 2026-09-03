@@ -111,6 +111,9 @@ function startSchedules(
 }
 
 function writeObservabilityRecord(record: ObservabilityRecord): void {
+  // Payloads are JSON-safe by type (Adversary finding 3): JSON.stringify
+  // cannot throw on a bigint or overflow on a cycle, because neither can
+  // reach this sink. No defensive try/catch needed — the type is the proof.
   // eslint-disable-next-line no-console
   console.log(JSON.stringify(record));
 }

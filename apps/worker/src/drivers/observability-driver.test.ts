@@ -14,12 +14,15 @@ import { AuditRetentionSweeper } from './audit-retention-sweeper.js';
 import { AuditVerifierScheduler } from './audit-verifier-scheduler.js';
 
 let store: AuditStore;
+/** Set only when beforeAll succeeded; afterAll must not TypeError when it did not. */
+let storeReady = false;
 let records: ObservabilityRecord[];
 
 beforeAll(async () => {
   const config = worktreeConfig();
   store = new AuditStore({ connectionString: config.databaseUrl });
   await store.ensureSchema();
+  storeReady = true;
 });
 
 beforeEach(async () => {
@@ -28,7 +31,9 @@ beforeEach(async () => {
 });
 
 afterAll(async () => {
-  await store.close();
+  // A missing configuration already fails the run with loadConfig's clear
+  // message; teardown must not bury it under a TypeError on undefined.
+  if (storeReady) await store.close();
 });
 
 describe('worker observability wiring', () => {
