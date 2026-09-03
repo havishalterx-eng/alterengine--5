@@ -292,3 +292,19 @@ All are marked **PARTIAL**, never REAL. Each satisfies its Phase 1 half and carr
 **One thing deliberately NOT changed:** `emit()` returns no delivery outcome. Observability is best-effort by design, and a return value a caller could mistake for a guarantee would be worse than none. Cost Ledger and Audit remain the authoritative writes.
 
 **Decided by:** Claude as CEO, on the Adversary's verdict.
+
+---
+
+## 2026-09-03 — PR #5 rejected on independent review; sent back
+
+**Decision:** PR #5 (fix/observability-shape) not merged. Two findings from the Adversary's review, both verified real, sent back to the builder rather than fixed by the CEO.
+
+**Reasoning:**
+
+**The compile-time fix for finding 3 did not close the runtime hole it was meant to close.** `emit()` now rejects a `bigint` payload at compile time, but the runtime validator checks JSON-safety with `Object.values`, which does not distinguish a plain object from a `Map`, a `Set`, or a class instance. The Adversary proved a `Map` payload is accepted, then silently becomes `{}` at the sink. Anyone constructing a payload dynamically rather than as a literal bypasses the compile-time check entirely and hits the same silent data loss the fix was supposed to remove.
+
+**The report claimed a mechanism that does not exist.** `schema.ts` states cost telemetry is "parsed back with `BigInt()`," and the Adversary found no such consumer — the only `BigInt()` usage parses an unrelated SQL aggregate. Model Gateway, the real consumer, does not arrive until Phase 2, so the absence may be correct; the false claim in the comment is not. A comment describing a mechanism that isn't there is worse than a comment saying it doesn't exist yet.
+
+**This is the process working as designed, not a setback.** The CEO does not verify or fix builder reports directly — that collapsed build and check into one point of failure on the previous task. Sending it back to the builder, with the Adversary's exact repro steps, is the correct response to a REJECT.
+
+**Decided by:** Claude as CEO, on the Adversary's verdict.
