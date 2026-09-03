@@ -417,3 +417,23 @@ The result, reproduced against real Postgres: transfer ownership to a user who h
 **Component 1 also owes the RLS enforcement proof deferred by component 42.** This is precisely the component that will supply real per-request tenant context (`app.current_account`), and it is the first thing in the sequence that runs as a non-superuser-equivalent boundary. The proof belongs here, not postponed further.
 
 **Decided by:** Claude as CEO.
+
+---
+
+## 2026-09-04 — Component 42 never actually enforced its own RLS; root-caused and assigned
+
+**Decision:** the fix belongs to component 42, not to component 1's gateway. Component 42 owns the RLS-protected tables and every tenant-scoped method already receives the `accountId` needed to supply session context; the gateway should not need to reach into another component's connection pool to make its own tables work.
+
+**Reasoning:** step 2's builder correctly stopped rather than hack around it — following the standing instruction to report a blocker rather than build a workaround. Investigated directly rather than accepting the framing in the report ("gateway needs an API that resolves inside its own pool"), because that framing would have produced a coupling between components 1 and 42 that does not belong there.
+
+**Root cause, confirmed by reading the migration:** the RLS policies on `accounts`, `memberships`, `custom_roles` use `CREATE POLICY ... USING (...)` with no `FOR` clause and no separate `WITH CHECK`. In Postgres this defaults to `FOR ALL`, and Postgres reuses the `USING` expression as `WITH CHECK` when none is given — so the policy gates INSERT and UPDATE as well as SELECT, not only SELECT as the earlier review implicitly assumed. `createAccount`'s own INSERT would fail under a genuine non-superuser role, not only `resolvePermissions`.
+
+**Why this was invisible until now.** Every local connection uses the `alter` role, which is a Postgres superuser, and RLS does not apply to a superuser regardless of `FORCE`. All 171 of component 42's existing tests, and the review that approved PR #7, ran against a connection for which the policies were structurally present but functionally inert. It surfaced only because step 2 was explicitly instructed to prove enforcement against a real non-superuser role — which is exactly why that instruction exists, and it did its job.
+
+**The fix:** `SET LOCAL app.current_account = $1` inside a transaction (`BEGIN` ... `SET LOCAL` ... the real query ... `COMMIT`), never a bare `SET` on a pooled connection — a pooled connection is reused across unrelated requests, and a session-level `SET` would leak one caller's tenant context into the next caller who happens to get the same connection. This is a correctness and security defect strictly worse than the one being fixed. `transferOwnership` already uses the correct `BEGIN`/`COMMIT`/`ROLLBACK` shape and is the pattern to extend, not reinvent.
+
+For `createAccount` specifically: the account id is generated client-side with `crypto.randomUUID()` before the insert, so `app.current_account` can be set to that value before either insert runs, and the `WITH CHECK` clause is satisfied because the row being inserted matches the value just set.
+
+**`findAccountByName` is a genuine open question, not assigned a fix.** It has no tenant id to scope by — that is the nature of a lookup by name across tenants. Whether that should remain unscoped (today it is a CLI convenience only), gated behind a separate elevated connection used deliberately for that one operation, or removed as a capability entirely, is a real product decision. The builder is asked to report options, not to resolve it silently.
+
+**Decided by:** Claude as CEO.
