@@ -25,7 +25,8 @@ Then your role brief in [`docs/roles/`](docs/roles/), then [`docs/build/STATUS.m
 | [`docs/build/DECISIONS.md`](docs/build/DECISIONS.md) | Append-only decision log |
 | `docs/build/build-order.md` | Superseded wave-based order. Kept for its dependency reasoning |
 | [`docs/build/METHOD.md`](docs/build/METHOD.md) | **How this build runs.** Read before anything else |
-| [`docs/build/SEQUENTIAL-BUILD-ORDER.md`](docs/build/SEQUENTIAL-BUILD-ORDER.md) | **The 49 remaining steps, in order**, each with its physical test |
+| [`docs/build/CHECKLIST.md`](docs/build/CHECKLIST.md) | **The live checklist.** Tick a box only when the physical test passes |
+| [`docs/build/SEQUENTIAL-BUILD-ORDER.md`](docs/build/SEQUENTIAL-BUILD-ORDER.md) | The 49 steps with full reasoning per step |
 | `docs/build/AGENT-ROSTER.md`, `SESSION-SETUP.md`, `LAUNCH-BRIEFS.md` | Superseded. Kept as the record of how Phase 1 was produced |
 | [`docs/architecture/contracts.md`](docs/architecture/contracts.md) | All 55 component contracts |
 | [`docs/architecture/whole.md`](docs/architecture/whole.md) | The engine as one system |
