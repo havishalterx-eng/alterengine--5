@@ -403,3 +403,17 @@ The result, reproduced against real Postgres: transfer ownership to a user who h
 **VERDICT: APPROVE.**
 
 **Decided by:** Claude as CEO, performing the Adversary's verification directly at Havish's explicit instruction.
+
+---
+
+## 2026-09-04 — Step 2 (component 1) scope: JWT belongs in Safety; trigger path deferred
+
+**Decision:** two scoping calls made before issuing step 2, the same discipline as PHASE-1-SCOPE.md.
+
+**JWT validation is a new shared primitive, built into `@alter/safety`, not into `@alter/identity`.** Contract 1 lists Safety & Policy as a plane dependency specifically for JWT validation, and no JWT code exists anywhere in the repo yet. Rule 18 — one definition per shared primitive — means it must live in one place from the start; component 1 consumes it rather than embedding its own copy. Public Surface (component 49) and any future component that verifies a bearer token will import the same implementation. Use an established library (`jose`) for the cryptography rather than hand-rolling signature verification — the previous build's audit specifically praised algorithm pinning at both the header check and the key-import filter, which is exactly the class of mistake a library gets right and a hand-rolled parser easily gets wrong.
+
+**Done-gate item 6 (trigger-originated tenant resolution) is scoped to its typed shape now, its end-to-end proof deferred.** The contract's own definition of that path depends on workflow-ownership facts (component 46, step 14, Phase 3) and on Event & Trigger Gateway actually producing a workflow reference (component 2, step 32, Phase 4). Neither exists yet. Building a real end-to-end test for this today would mean fabricating both inputs, which produces a test that looks like proof and is not — the exact previous-build failure this rebuild exists to prevent. The entry point and its typed contract are built now, so nothing later has to retrofit the shape; the done-gate proof is a mandatory revisit at step 32.
+
+**Component 1 also owes the RLS enforcement proof deferred by component 42.** This is precisely the component that will supply real per-request tenant context (`app.current_account`), and it is the first thing in the sequence that runs as a non-superuser-equivalent boundary. The proof belongs here, not postponed further.
+
+**Decided by:** Claude as CEO.

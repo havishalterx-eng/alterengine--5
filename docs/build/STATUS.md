@@ -198,6 +198,8 @@ Two shared primitives, both rule-enforcing, both tested. Nothing else.
 | 20 | Node Type Registry | Phase 2 — one node type | Phases 4–5 — Tool, Gate, HumanApproval, Merge | — |
 | 10 | Architecture Synthesizer | Phase 3 — decides topology | Phase 6 — Policy Store informs patterns | — |
 | 12 | Selection & Binding | Phase 3 — scoring | Phase 6 — learned routing weights | — |
+| 1 | Identity & Tenant Gateway | Step 2 — bearer-token path only | Step 32 (component 2 lands) — trigger-originated tenant resolution, done-gate item 6 | — |
+| 42 | Identity & Membership | Step 1 — RLS policies added, unproven | Step 2 — RLS enforcement proven against real per-request tenant context | — |
 | 35 | Type/Schema Contracts | Phase 1 — 501 + inventory halves of gate 7 | Phase 3 — disabled-state half, once a UI exists | — |
 | 36 | Observability | Phase 1 — schema, attribution shape, fail-open outage | Phase 2 — real trace across a real run; Phase 5 — alerting via 45 | — |
 | 37 | Safety & Policy | Phase 1 — SSRF guard, redaction primitive, no-duplicate check | Phase 2 — injection classifier via 26; Phase 4 — PII on real egress paths | — |
