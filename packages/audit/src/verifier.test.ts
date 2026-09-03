@@ -5,13 +5,19 @@ import { createAuditHarness, type AuditHarness } from './test-helpers.js';
 import { verifyEvents } from './verifier.js';
 
 let h: AuditHarness;
+/** Set only when beforeAll succeeded; afterAll must not TypeError when it did not. */
+let hReady = false;
 
 beforeAll(async () => {
   h = await createAuditHarness();
+  hReady = true;
 });
 
 afterAll(async () => {
-  await h.close();
+  // Missing configuration already fails the run once, clearly, at loadConfig;
+  // teardown must not add a TypeError on a harness that was never created.
+  // Same pattern as the worker driver tests.
+  if (hReady) await h.close();
 });
 
 beforeEach(async () => {

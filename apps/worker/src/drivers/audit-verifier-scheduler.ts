@@ -1,7 +1,8 @@
 import type {
   AuditAlertSink,
   AuditChainVerifier} from '@alter/audit';
-import { SYSTEM_TENANT, type Observer } from '@alter/observability';
+import type { JsonObject } from '@alter/safety';
+import { type ObservabilityRecord, type Observer } from '@alter/observability';
 import {
   type VerificationResult,
 } from '@alter/audit';
@@ -60,17 +61,21 @@ export class AuditVerifierScheduler {
   }
 }
 
-function record(name: string, payload: Record<string, unknown>) {
+/**
+ * A system record carries driver identity, never run identity (Adversary
+ * finding 4). `runId: 'system:worker'` fabricated a run that Run Monitor
+ * would have listed as real; this record cannot name a run at all — the type
+ * has no field for it and the schema rejects the key.
+ */
+function record(name: string, payload: JsonObject): ObservabilityRecord {
   return {
     component: '38',
-    kind: 'event' as const,
+    driver: 'audit-verifier-scheduler',
+    kind: 'event',
     name,
-    nodeId: 'audit-verifier-scheduler',
     payload,
-    runId: 'system:worker',
-    schemaVersion: 1 as const,
-    scope: 'system' as const,
-    tenantId: SYSTEM_TENANT,
+    schemaVersion: 1,
+    scope: 'system',
   };
 }
 

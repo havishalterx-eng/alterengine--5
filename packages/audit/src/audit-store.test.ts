@@ -4,9 +4,12 @@ import { GENESIS_HASH } from './hash.js';
 import { createAuditHarness, type AuditHarness } from './test-helpers.js';
 
 let h: AuditHarness;
+/** Set only when beforeAll succeeded; afterAll must not TypeError when it did not. */
+let hReady = false;
 
 beforeAll(async () => {
   h = await createAuditHarness();
+  hReady = true;
 });
 
 beforeEach(async () => {
@@ -14,7 +17,11 @@ beforeEach(async () => {
 });
 
 afterAll(async () => {
-  await h.close();
+  // If beforeAll failed — e.g. missing configuration, which loadConfig reports
+  // with a clear message — teardown must not bury it under "Cannot read
+  // properties of undefined (reading 'close')". Same pattern as the worker
+  // driver tests.
+  if (hReady) await h.close();
 });
 
 /** Runs a block inside a transaction with the minimization flag set. */

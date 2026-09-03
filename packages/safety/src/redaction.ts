@@ -25,6 +25,21 @@ export interface RedactionRule {
   readonly path: string;
 }
 
+/**
+ * One redaction primitive, one type (rule 18). Observability's seam accepts
+ * this exact function shape with no cast at the call site — a cast at a
+ * policy boundary is where redaction quietly stops happening.
+ */
+export type Redactor = (payload: JsonObject) => JsonObject;
+
+/**
+ * Binds a rule set into a Redactor. The single adapter between Safety's
+ * rule-path redaction and any consumer that takes a Redactor.
+ */
+export function createRedactor(rules: readonly RedactionRule[]): Redactor {
+  return (payload) => redact(payload, rules);
+}
+
 export class RedactionRuleError extends Error {
   public constructor(message: string) {
     super(message);
