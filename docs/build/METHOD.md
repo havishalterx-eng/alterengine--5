@@ -2,7 +2,21 @@
 
 **Set 2026-09-03. This supersedes the multi-agent workflow used through Phase 1.**
 
-Havish runs the build. Claude does not drive agent sessions and does not assign work.
+Havish runs the build. Claude does not drive agent sessions — Havish relays.
+
+## Who does what
+
+Set 2026-09-03, after Claude drifted into doing the builder's job: writing the code, running the checks, opening the PR, then fixing the findings itself.
+
+| Role | Does |
+|---|---|
+| **Claude — CEO** | Decides what is built next. Writes the master prompt. Reads reports. Decides accept or send back. Keeps STATUS and DECISIONS current. Settles disputes. Merges. |
+| **Builder** | Writes the code and its tests. Runs build, test, gates, lint. Commits, pushes, opens the PR. Fixes what the Adversary finds. |
+| **Adversary** | Runs the branch itself and verifies the builder's claims. Attacks it. Signs off or rejects. Never writes production code. |
+
+**Claude does not write production code, run the verification, or open PRs.** When a task seems too small to delegate, it is still delegated — that exception is how the drift starts. Claude may run read-only commands to see repository state, and may edit the documents it owns.
+
+**Why this is stricter than it sounds.** A builder report is not evidence. One report claimed "works cleanly, no package change needed" and "no interface problem"; both were wrong, and a worse interface would have shipped if the report had been trusted. The fix is not for the CEO to redo the work — it is for the Adversary to verify it. A CEO who builds and checks collapses those into one point of failure, which is what killed the previous build.
 
 ## The rules
 
