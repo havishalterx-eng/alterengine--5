@@ -449,3 +449,17 @@ For `createAccount` specifically: the account id is generated client-side with `
 **The boundary that makes this acceptable:** it stays reachable only from trusted internal tooling that already runs with elevated access, and it must never become reachable from component 1 or any component that serves an actual tenant request. If a future need arises to let an end user search or list accounts — a workspace switcher, for instance — that is a different, correctly-scoped operation: querying the caller's own memberships, never a name-based cross-tenant search. That is a new decision when it comes up, not an extension of this one.
 
 **Decided by:** Claude as CEO, overruling the builder's recommendation with reasoning recorded.
+
+---
+
+## 2026-09-04 — PR #8 rejected on finding 1, finding 2 rejected as inaccurate
+
+**Decision:** PR #8 not merged. Adversary's finding 1 verified real and confirmed independently. Finding 2 does not reproduce and is not accepted — corrected on the record rather than passed through silently.
+
+**Finding 1, accepted.** The RLS policies cast `current_setting('app.current_account', true)` directly to `::uuid` with no guard. Postgres resets a custom GUC to an empty string after a `SET LOCAL` transaction commits — not NULL — so any later transaction on the same connection that does not explicitly reset the value hits a raw Postgres error rather than a clean deny. Reproduced directly as a non-superuser: `BEGIN; SET LOCAL app.current_account='x'; COMMIT;` followed by a second transaction querying `accounts` throws `ERROR: invalid input syntax for type uuid: ""` rather than returning zero rows. That is worse than the defect being fixed — an unhandled exception on a connection that has ever been used for one tenant and is then reused, rather than a silent, correct deny.
+
+**Finding 2, rejected.** The report claims `audit-store.test.ts` and `verifier.test.ts` "call `h.close()` when setup never assigned `h`," reproducing the exact defect and exact wording fixed in PR #5 round 3. Read the current source on the PR #8 branch directly: the guard is present — `if (hReady) await h.close()`. Ran both files independently with `DATABASE_URL` unset: one clean `ConfigurationError` each, zero `TypeError`s. Ran the full suite unset: 8 files fail (not the 6 claimed), every one with a clean `ConfigurationError`, zero `TypeError`s anywhere. The finding does not describe the code that exists on this branch. Most likely explanation: carried over from an earlier review round rather than re-verified against this branch. Corrected on the record for the same reason the false Alibaba-metadata-IP finding was corrected rather than silently accepted — a reviewer being wrong once is a reason to verify, not a reason to distrust everything, but it must not be quietly waved through either.
+
+**The builder fixes finding 1 only.** Do not touch the teardown guards in either audit test file — they are correct and working; changing working code to chase a finding that does not reproduce is how a real regression gets introduced while fixing nothing.
+
+**Decided by:** Claude as CEO, verifying both findings independently rather than accepting the verdict as delivered.
