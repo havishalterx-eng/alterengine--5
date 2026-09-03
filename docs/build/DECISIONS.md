@@ -383,3 +383,23 @@ The result, reproduced against real Postgres: transfer ownership to a user who h
 **Not flagged, checked and found clean:** custom-role isolation is real SQL-level scoping (`WHERE account_id = $1`), not an application-level filter; the `no-console` eslint carve-out is scoped exactly to `packages/*/src/cli.ts`, matching the existing `scripts/**` precedent.
 
 **Decided by:** Claude as CEO, performing the Adversary's verification directly at Havish's explicit instruction — the tool was unavailable.
+
+---
+
+## 2026-09-03 — PR #7 approved, verified by the CEO directly
+
+**Decision:** PR #7 (component 42) merged. Adversary tool still unavailable; same explicit exception as rounds prior.
+
+**Verification performed, all independent:**
+
+- Fresh build, **154 tests run directly**, 18 files, all pass
+- Reproduced the exact defect scenario from round 1: transfer to a genuine non-member, existing user. `resolvePermissions()` now returns a real ten-permission set with `isOwner: true`; `can(create_workflow)` returns `true`. The previous owner correctly drops to `isOwner: false` while keeping their Admin membership.
+- Reproduced the builder's own additional scenario — transfer to a brand-new email never seen before — independently, not on trust. Passed.
+- **Tested atomicity beyond what either report claimed**, not just read the `BEGIN`/`COMMIT`/`ROLLBACK` structure: forced a real failure (transfer against a nonexistent account) and confirmed the user row created earlier in the same transaction was NOT committed — genuine rollback, not a partial write papered over by error handling.
+- **Verified RLS against the live schema directly**, `pg_class` and `pg_policies`, not the builder's own existence test: `relrowsecurity` and `relforcerowsecurity` both true on `accounts`, `memberships`, `custom_roles`; `users` correctly excluded; the policy predicate matches what was claimed.
+- **Went further than either report's proof**: created a genuine non-superuser Postgres role and connected as it directly, rather than trusting that FORCE would work as designed. Confirmed zero rows with `app.current_account` unset, and confirmed exactly one row returned when the setting matched a real account. This proves the policy is substantively correct — not merely present — for the one connection type (non-superuser) that will eventually use it, even though the builder's own disclosed gap (the `alter` role used by every builder today is a superuser, and RLS does not apply to it) is confirmed accurate and remains unresolved until step 2's per-request context exists.
+- Gates and lint clean.
+
+**VERDICT: APPROVE.**
+
+**Decided by:** Claude as CEO, performing the Adversary's verification directly at Havish's explicit instruction.
