@@ -1,4 +1,4 @@
-import { readFile } from 'node:fs/promises';
+import { loadConfig } from '@alter/contracts';
 import { Client } from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createCostLedger } from './ledger.js';
@@ -9,7 +9,7 @@ let databaseUrl: string;
 let ledger: ReturnType<typeof createCostLedger>;
 
 beforeAll(async () => {
-  databaseUrl = await configuredDatabaseUrl();
+  databaseUrl = configuredDatabaseUrl();
   ledger = createCostLedger({ databaseUrl });
   await ledger.migrate();
 });
@@ -100,15 +100,9 @@ describe('Cost Ledger', () => {
   });
 });
 
-async function configuredDatabaseUrl(): Promise<string> {
-  if (process.env.DATABASE_URL !== undefined && process.env.DATABASE_URL !== '') {
-    return process.env.DATABASE_URL;
-  }
-
-  const env = await readFile('.env', 'utf8');
-  const line = env.split('\n').find((candidate) => candidate.startsWith('DATABASE_URL='));
-  if (line === undefined) throw new Error('DATABASE_URL is required for real Cost Ledger tests');
-  return line.slice('DATABASE_URL='.length);
+// One path. See audit-driver.test.ts for why the .env fallback is gone.
+function configuredDatabaseUrl(): string {
+  return loadConfig(process.env).databaseUrl;
 }
 
 async function persistedVerdict(url: string, key: string): Promise<string | null> {

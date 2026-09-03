@@ -81,6 +81,9 @@ importers:
 
   packages/cost-ledger:
     dependencies:
+      '@alter/contracts':
+        specifier: workspace:*
+        version: link:../contracts
       pg:
         specifier: ^8.23.0
         version: 8.23.0
@@ -91,6 +94,9 @@ importers:
 
   packages/deletion-registry:
     dependencies:
+      '@alter/contracts':
+        specifier: workspace:*
+        version: link:../contracts
       pg:
         specifier: ^8.16.0
         version: 8.23.0

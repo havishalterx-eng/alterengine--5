@@ -15,7 +15,8 @@
     "build": "tsc --build"
   },
   "dependencies": {
-    "pg": "^8.23.0"
+    "pg": "^8.23.0",
+    "@alter/contracts": "workspace:*"
   },
   "devDependencies": {
     "@types/pg": "^8.23.1"

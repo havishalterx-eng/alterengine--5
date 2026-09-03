@@ -1,5 +1,4 @@
-import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { loadConfig } from '@alter/contracts';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import {
   AuditAlertSink,
@@ -27,12 +26,11 @@ let store: AuditStore;
 let scheduler: AuditVerifierScheduler;
 let sweeper: AuditRetentionSweeper;
 
+// One path. vitest.config.ts loads .env when one exists, CI exports the same
+// variables directly, and a test that also reads the file itself verifies
+// under conditions that vary by machine.
 function databaseUrl(): string {
-  if (process.env.DATABASE_URL) return process.env.DATABASE_URL;
-  const text = readFileSync(join(process.cwd(), '.env'), 'utf8');
-  const match = text.match(/^DATABASE_URL=(.+)$/m);
-  if (!match) throw new Error('DATABASE_URL not set and not present in .env');
-  return match[1]!.trim();
+  return loadConfig(process.env).databaseUrl;
 }
 
 beforeAll(async () => {

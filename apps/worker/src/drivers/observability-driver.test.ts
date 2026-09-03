@@ -1,4 +1,3 @@
-import { readFile } from 'node:fs/promises';
 import {
   AuditAlertSink,
   AuditChainVerifier,
@@ -18,7 +17,7 @@ let store: AuditStore;
 let records: ObservabilityRecord[];
 
 beforeAll(async () => {
-  const config = loadConfig(await worktreeEnvironment());
+  const config = worktreeConfig();
   store = new AuditStore({ connectionString: config.databaseUrl });
   await store.ensureSchema();
 });
@@ -89,7 +88,7 @@ describe('worker observability wiring', () => {
   });
 
   it('emits an error record before propagating a verifier tick failure', async () => {
-    const closedStore = new AuditStore({ connectionString: (await worktreeConfig()).databaseUrl });
+    const closedStore = new AuditStore({ connectionString: (worktreeConfig()).databaseUrl });
     await closedStore.ensureSchema();
     await closedStore.close();
     const scheduler = new AuditVerifierScheduler(
@@ -110,7 +109,7 @@ describe('worker observability wiring', () => {
   });
 
   it('emits an error record before propagating a retention tick failure', async () => {
-    const closedStore = new AuditStore({ connectionString: (await worktreeConfig()).databaseUrl });
+    const closedStore = new AuditStore({ connectionString: (worktreeConfig()).databaseUrl });
     await closedStore.ensureSchema();
     await closedStore.close();
     const sweeper = new AuditRetentionSweeper(closedStore, recordingObserver());
@@ -136,18 +135,17 @@ function recordingObserver() {
   });
 }
 
-async function worktreeConfig() {
-  return loadConfig(await worktreeEnvironment());
-}
-
-async function worktreeEnvironment(): Promise<Readonly<Record<string, string | undefined>>> {
-  const file = await readFile('.env', 'utf8');
-  const environment: Record<string, string | undefined> = {};
-  for (const line of file.split('\n')) {
-    if (line.length === 0 || line.startsWith('#')) continue;
-    const separator = line.indexOf('=');
-    if (separator < 1) continue;
-    environment[line.slice(0, separator)] = line.slice(separator + 1);
-  }
-  return environment;
+/**
+ * Configuration for this test.
+ *
+ * Reads the environment, never the .env file. vitest.config.ts already loads
+ * .env into the test environment when one exists, and CI exports the same
+ * variables directly with no file present.
+ *
+ * A test that opens .env itself passes locally and fails in CI. That exact
+ * bug was fixed once in registry.test.ts and reappeared here, because
+ * nothing prevented it -- so it is now also a gate.
+ */
+function worktreeConfig() {
+  return loadConfig(process.env);
 }
