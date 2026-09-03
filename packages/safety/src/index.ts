@@ -12,6 +12,8 @@ export {
 export {
   createSsrfGuard,
   SsrfBlockedError,
+  type GuardedMethod,
+  type GuardedRequestInit,
   type SafeFetchResponse,
 } from './ssrf.internal.js';
 
