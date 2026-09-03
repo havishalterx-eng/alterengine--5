@@ -26,6 +26,27 @@ Building one component at a time behind a surface a human can actually touch col
 
 [`SEQUENTIAL-BUILD-ORDER.md`](SEQUENTIAL-BUILD-ORDER.md) lists all 49 remaining steps in strict sequence, each with the physical test that closes it.
 
+## After a merge: reset, never rebase
+
+**A merged branch must be reset to `origin/main`, not rebased onto it.**
+
+Merges here are squash merges, so the branch's individual commits land on main under a single new hash. Rebasing that branch afterwards replays commits whose content is already present, and every file conflicts with itself. It looks like a serious history problem and is nothing of the kind.
+
+```bash
+cd /private/tmp/wt-<agent>
+git rebase --abort            # if one is already stuck
+git checkout -B agent/<name> origin/main
+pnpm install && pnpm build
+```
+
+Before resetting, check the branch is genuinely merged — content, not commit hashes, since squashing changes those:
+
+```bash
+git diff --stat origin/main origin/agent/<name> -- packages apps scripts
+```
+
+Lines the branch has that main lacks are the only thing at risk. Read them. In the one case this has happened, all eight were older code main had already replaced, so nothing was lost — but that was checked, not assumed.
+
 ## What this does not change
 
 The done gates, the ten architecture gates, `GATE_MODE=fail`, and the PARTIAL/REAL distinction all stand. `docs/build/STATUS.md` remains the single source of truth for progress, and every recorded revisit still blocks its phase gate.
