@@ -345,3 +345,23 @@ Continuing to send back one-finding-at-a-time patches would very likely produce 
 **VERDICT: APPROVE.**
 
 **Decided by:** Claude as CEO, performing the Adversary's verification directly at Havish's explicit instruction, with the same standard the Adversary has held every prior round: nothing accepted without independent reproduction.
+
+---
+
+## 2026-09-03 — PR #6 approved, verified by the CEO directly
+
+**Decision:** PR #6 merged. The Adversary tool was unavailable again; Havish instructed the CEO to run the review itself. Same explicit, stated exception as PR #5's round 4, not a standing practice.
+
+**Verification performed, all independent:**
+
+- Fresh build, **140 tests run directly**, 17 files, all pass
+- Redirect credential stripping tested against real HTTP servers with an attack beyond the builder's own proof: a 3-hop chain with a same-origin hop followed by a cross-origin hop. The credential survived the same-origin hop and was stripped exactly at the cross-origin one — confirms the guard is not over-stripping on same-origin redirects, which the builder's report did not demonstrate either way.
+- Read `validatedResponseLimit` directly: the cap is enforced by an unconditional clamp to `[1, MAX_RESPONSE_BYTES]`, and the constant is not exported from the package barrel, so no caller can reference or raise it. Read `readResponse` directly: it checks length per streamed chunk and destroys the connection on overflow — genuinely streamed, never buffers the full body before checking.
+- Cost Ledger race condition tested against real Postgres, not asserted sequentially: two concurrent `attachVerdict` calls with different verdicts on the same cost produced exactly one winner and a real `VerdictConflictError` on the loser. Confirmed idempotent replay of the winning verdict, and confirmed `attachVerdict` on a nonexistent key throws `CostNotFoundError` rather than creating a row.
+- **Judged, not just verified, the `@driver requestPinned` tag** the builder used to resolve a `driver-existence` gate finding on a per-request timeout. Read the code directly: the timer arms and clears entirely within one caller-driven request, with no persistence beyond it — structurally different from the background-machinery pattern the gate exists to catch. The reasoning is stated plainly in a comment for a future reader, not hidden. Judged legitimate, not a workaround that erodes the gate's meaning.
+- Re-ran the SSRF test suite in isolation to confirm nothing from the original review — DNS rebinding, private ranges, IPv4-mapped IPv6, metadata endpoints — regressed: 24/24 still pass.
+- All 11 gates clean, lint clean, with `DATABASE_URL` genuinely exported this time rather than repeating the environment mistake from the PR #5 review.
+
+**VERDICT: APPROVE.**
+
+**Decided by:** Claude as CEO, performing the Adversary's verification directly at Havish's explicit instruction.
