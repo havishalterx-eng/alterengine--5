@@ -8,6 +8,7 @@
     { "path": "packages/cost-ledger" },
     { "path": "packages/audit" },
     { "path": "packages/identity" },
+    { "path": "packages/tenant-gateway" },
     { "path": "apps/api" },
     { "path": "apps/worker" },
     { "path": "apps/sandbox" }
