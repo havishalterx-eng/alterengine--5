@@ -1,5 +1,5 @@
 {
-  "name": "@alter/safety",
+  "name": "@alter/tenant-gateway",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -16,6 +16,9 @@
   },
   "dependencies": {
     "@alter/contracts": "workspace:*",
-    "jose": "^6.2.10"
+    "@alter/identity": "workspace:*",
+    "@alter/safety": "workspace:*",
+    "jose": "^6.2.10",
+    "pg": "^8.13.1"
   }
 }

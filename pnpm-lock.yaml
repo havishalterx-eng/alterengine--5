@@ -134,6 +134,27 @@ importers:
       '@alter/contracts':
         specifier: workspace:*
         version: link:../contracts
+      jose:
+        specifier: ^6.2.10
+        version: 6.2.10
+
+  packages/tenant-gateway:
+    dependencies:
+      '@alter/contracts':
+        specifier: workspace:*
+        version: link:../contracts
+      '@alter/identity':
+        specifier: workspace:*
+        version: link:../identity
+      '@alter/safety':
+        specifier: workspace:*
+        version: link:../safety
+      jose:
+        specifier: ^6.2.10
+        version: 6.2.10
+      pg:
+        specifier: ^8.13.1
+        version: 8.23.0
 
 packages:
 
@@ -824,6 +845,9 @@ packages:
 
   isexe@2.0.0:
     resolution: {integrity: sha512-RHxMLp9lnKHGHRng9QFhRCMbYAcVpn69smSGcq3f36xjgVVWThj4qqLbTLlq7Ssj8B+fIQ1EuCEGI2lKsyQeIw==}
+
+  jose@6.2.10:
+    resolution: {integrity: sha512-iiW7J9qRFlGxvCOIBDBDxFePQSn7ZMAnrYGhrrOo6siO/MIqwfyilLR27pkfDgUk+raLuzADS8A3S/KLBisc0g==}
 
   js-yaml@4.3.2:
     resolution: {integrity: sha512-SFNOvSJ+Dgf/9An904Yx+CgSlIPCkIpao4qo51lpee25TIRejdH3rhR4EZMGoNx3/TP3O+wzWuiTFl4sqbltzA==}
@@ -1759,6 +1783,8 @@ snapshots:
       is-extglob: 2.1.1
 
   isexe@2.0.0: {}
+
+  jose@6.2.10: {}
 
   js-yaml@4.3.2:
     dependencies:

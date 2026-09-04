@@ -21,3 +21,13 @@ export {
   classifyInjection,
   type InjectionClassificationRequest,
 } from './injection.js';
+
+export {
+  createJwtValidator,
+  JwtRejectedError,
+  MAX_CLOCK_SKEW_SECONDS,
+  PINNED_ALG,
+  type JwtClaims,
+  type JwtValidator,
+  type JwtValidatorOptions,
+} from './jwt.js';
