@@ -4,7 +4,7 @@ import {
   PERMISSION_TOGGLES,
   TOGGLE_LABELS,
 } from './permissions.js';
-import { createIdentityStore, type IdentityStore } from './store.js';
+import { createIdentityToolingStore, type IdentityToolingStore } from './tooling.js';
 
 /**
  * Component 42's terminal surface — the physical test for step 1.
@@ -28,7 +28,7 @@ import { createIdentityStore, type IdentityStore } from './store.js';
 interface Command {
   readonly name: string;
   readonly usage: string;
-  run(store: IdentityStore, args: readonly string[]): Promise<void>;
+  run(store: IdentityToolingStore, args: readonly string[]): Promise<void>;
 }
 
 const commands: readonly Command[] = [
@@ -124,7 +124,7 @@ async function main(): Promise<void> {
     process.exitCode = commandName === undefined ? 0 : 1;
     return;
   }
-  const store = createIdentityStore({ databaseUrl: loadConfig().databaseUrl });
+  const store = createIdentityToolingStore({ databaseUrl: loadConfig().databaseUrl });
   try {
     await store.migrate();
     await command.run(store, args);
@@ -133,7 +133,7 @@ async function main(): Promise<void> {
   }
 }
 
-async function mustFindAccount(store: IdentityStore, name: string) {
+async function mustFindAccount(store: IdentityToolingStore, name: string) {
   const account = await store.findAccountByName(name);
   if (account === null) {
     console.log(`no account named "${name}" exists`);
