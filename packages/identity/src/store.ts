@@ -51,7 +51,6 @@ export interface IdentityStore {
   close(): Promise<void>;
   migrate(): Promise<void>;
   createAccount(input: { readonly name: string; readonly ownerEmail: string }): Promise<AccountRef>;
-  findAccountByName(name: string): Promise<AccountRef | null>;
   findUserByEmail(email: string): Promise<UserRef | null>;
   addMember(input: {
     readonly accountId: string;
@@ -71,6 +70,15 @@ export interface IdentityStore {
   can(accountId: string, userId: string, action: MemberAction): Promise<boolean>;
 }
 
+/**
+ * Internal tooling only. Name lookup must never be exposed to a real tenant
+ * request or imported by Component 1; use `@alter/identity/tooling` only for
+ * the terminal CLI that proves Component 42.
+ */
+export interface IdentityToolingStore extends IdentityStore {
+  findAccountByName(name: string): Promise<AccountRef | null>;
+}
+
 export interface AccountRef {
   readonly accountId: string;
   readonly name: string;
@@ -82,6 +90,18 @@ export interface UserRef {
 }
 
 export function createIdentityStore({ databaseUrl }: { readonly databaseUrl: string }): IdentityStore {
+  return createStore({ databaseUrl });
+}
+
+export function createIdentityToolingStore({
+  databaseUrl,
+}: {
+  readonly databaseUrl: string;
+}): IdentityToolingStore {
+  return createStore({ databaseUrl });
+}
+
+function createStore({ databaseUrl }: { readonly databaseUrl: string }): IdentityToolingStore {
   const pool = new Pool({ connectionString: databaseUrl });
 
   return {
@@ -95,22 +115,24 @@ export function createIdentityStore({ databaseUrl }: { readonly databaseUrl: str
     },
 
     createAccount: async ({ name, ownerEmail }) => {
-      const owner = await ensureUser(pool, ownerEmail);
       // The creator holds owner-only actions via owner_user_id — never via a
       // role. They also get a day-to-day Admin membership so they can act.
       const accountId = crypto.randomUUID();
-      await pool.query('INSERT INTO accounts (id, name, owner_user_id) VALUES ($1, $2, $3)', [
-        accountId,
-        name,
-        owner.userId,
-      ]);
-      await pool.query('INSERT INTO memberships (id, account_id, user_id, role_name) VALUES ($1, $2, $3, $4)', [
-        crypto.randomUUID(),
-        accountId,
-        owner.userId,
-        'Admin',
-      ]);
-      return { accountId, name };
+      return inTenantTransaction(pool, accountId, async (client) => {
+        const owner = await ensureUser(client, ownerEmail);
+        await client.query('INSERT INTO accounts (id, name, owner_user_id) VALUES ($1, $2, $3)', [
+          accountId,
+          name,
+          owner.userId,
+        ]);
+        await client.query('INSERT INTO memberships (id, account_id, user_id, role_name) VALUES ($1, $2, $3, $4)', [
+          crypto.randomUUID(),
+          accountId,
+          owner.userId,
+          'Admin',
+        ]);
+        return { accountId, name };
+      });
     },
 
     findAccountByName: async (name) => {
@@ -132,37 +154,43 @@ export function createIdentityStore({ databaseUrl }: { readonly databaseUrl: str
     },
 
     addMember: async ({ accountId, email, role }) => {
-      const resolved = await resolveRoleName(pool, accountId, role);
-      if (resolved === undefined) throw new UnknownRoleError(role, accountId);
-      const user = await ensureUser(pool, email);
-      await pool.query(
-        'INSERT INTO memberships (id, account_id, user_id, role_name) VALUES ($1, $2, $3, $4) ' +
-          'ON CONFLICT (account_id, user_id) DO UPDATE SET role_name = EXCLUDED.role_name',
-        [crypto.randomUUID(), accountId, user.userId, role],
-      );
-      return user;
+      return inTenantTransaction(pool, accountId, async (client) => {
+        const resolved = await resolveRoleName(client, accountId, role);
+        if (resolved === undefined) throw new UnknownRoleError(role, accountId);
+        const user = await ensureUser(client, email);
+        await client.query(
+          'INSERT INTO memberships (id, account_id, user_id, role_name) VALUES ($1, $2, $3, $4) ' +
+            'ON CONFLICT (account_id, user_id) DO UPDATE SET role_name = EXCLUDED.role_name',
+          [crypto.randomUUID(), accountId, user.userId, role],
+        );
+        return user;
+      });
     },
 
     removeMember: async ({ accountId, email }) => {
-      const user = await findUser(pool, email);
-      if (user === null) throw new NotAMemberError(email, accountId);
-      // Immediate: the row is deleted, so the next resolution — on any live
-      // connection, from any process — sees no membership and grants
-      // nothing. There is no cache to expire.
-      await pool.query('DELETE FROM memberships WHERE account_id = $1 AND user_id = $2', [
-        accountId,
-        user.userId,
-      ]);
+      await inTenantTransaction(pool, accountId, async (client) => {
+        const user = await findUser(client, email);
+        if (user === null) throw new NotAMemberError(email, accountId);
+        // Immediate: the row is deleted, so the next resolution — on any live
+        // connection, from any process — sees no membership and grants
+        // nothing. There is no cache to expire.
+        await client.query('DELETE FROM memberships WHERE account_id = $1 AND user_id = $2', [
+          accountId,
+          user.userId,
+        ]);
+      });
     },
 
     setMemberRole: async ({ accountId, userId, role }) => {
-      const resolved = await resolveRoleName(pool, accountId, role);
-      if (resolved === undefined) throw new UnknownRoleError(role, accountId);
-      const updated = await pool.query(
-        'UPDATE memberships SET role_name = $1 WHERE account_id = $2 AND user_id = $3 RETURNING id',
-        [role, accountId, userId],
-      );
-      if (updated.rowCount === 0) throw new NotAMemberError(userId, accountId);
+      await inTenantTransaction(pool, accountId, async (client) => {
+        const resolved = await resolveRoleName(client, accountId, role);
+        if (resolved === undefined) throw new UnknownRoleError(role, accountId);
+        const updated = await client.query(
+          'UPDATE memberships SET role_name = $1 WHERE account_id = $2 AND user_id = $3 RETURNING id',
+          [role, accountId, userId],
+        );
+        if (updated.rowCount === 0) throw new NotAMemberError(userId, accountId);
+      });
     },
 
     createCustomRole: async ({ accountId, name, toggles }) => {
@@ -174,27 +202,31 @@ export function createIdentityStore({ databaseUrl }: { readonly databaseUrl: str
           throw new Error(`Not one of the ten permission toggles: "${toggle}"`);
         }
       }
-      const flags = new Set(toggles);
-      await pool.query(
-        `INSERT INTO custom_roles (
-           id, account_id, name, ${PERMISSION_TOGGLES.join(', ')}
-         ) VALUES ($1, $2, $3, ${PERMISSION_TOGGLES.map((_, index) => `$${index + 4}`).join(', ')})`,
-        [crypto.randomUUID(), accountId, name, ...PERMISSION_TOGGLES.map((t) => flags.has(t))],
-      );
-      return { name, predefined: false, toggles };
+      return inTenantTransaction(pool, accountId, async (client) => {
+        const flags = new Set(toggles);
+        await client.query(
+          `INSERT INTO custom_roles (
+             id, account_id, name, ${PERMISSION_TOGGLES.join(', ')}
+           ) VALUES ($1, $2, $3, ${PERMISSION_TOGGLES.map((_, index) => `$${index + 4}`).join(', ')})`,
+          [crypto.randomUUID(), accountId, name, ...PERMISSION_TOGGLES.map((t) => flags.has(t))],
+        );
+        return { name, predefined: false, toggles };
+      });
     },
 
     listRoles: async (accountId) => {
-      const customs = await pool.query<CustomRoleRow>(
-        'SELECT * FROM custom_roles WHERE account_id = $1 ORDER BY name',
-        [accountId],
-      );
-      // The shipped presets plus THIS tenant's customs — another tenant's
-      // custom role never appears here, because the lookup is scoped.
-      return [
-        ...PREDEFINED_ROLES,
-        ...customs.rows.map((row) => roleFromRow(row)),
-      ];
+      return inTenantTransaction(pool, accountId, async (client) => {
+        const customs = await client.query<CustomRoleRow>(
+          'SELECT * FROM custom_roles WHERE account_id = $1 ORDER BY name',
+          [accountId],
+        );
+        // The shipped presets plus THIS tenant's customs — another tenant's
+        // custom role never appears here, because the lookup is scoped.
+        return [
+          ...PREDEFINED_ROLES,
+          ...customs.rows.map((row) => roleFromRow(row)),
+        ];
+      });
     },
 
     transferOwnership: async ({ accountId, toEmail }) => {
@@ -213,10 +245,7 @@ export function createIdentityStore({ databaseUrl }: { readonly databaseUrl: str
       // together or not at all — no window where ownership has moved but
       // membership has not caught up. The previous owner's own Admin
       // membership is untouched.
-      const client = await pool.connect();
-      try {
-        await client.query('BEGIN');
-
+      await inTenantTransaction(pool, accountId, async (client) => {
         let successorId = await userIdByEmail(client, toEmail);
         if (successorId === null) {
           successorId = crypto.randomUUID();
@@ -231,7 +260,6 @@ export function createIdentityStore({ databaseUrl }: { readonly databaseUrl: str
           [successorId, accountId],
         );
         if (updated.rowCount === 0) {
-          await client.query('ROLLBACK');
           throw new NotAMemberError(toEmail, accountId);
         }
 
@@ -240,76 +268,93 @@ export function createIdentityStore({ databaseUrl }: { readonly databaseUrl: str
             'ON CONFLICT (account_id, user_id) DO UPDATE SET role_name = EXCLUDED.role_name',
           [crypto.randomUUID(), accountId, successorId, 'Admin'],
         );
-
-        await client.query('COMMIT');
-      } catch (error) {
-        await client.query('ROLLBACK').catch(() => undefined);
-        throw error;
-      } finally {
-        client.release();
-      }
+      });
     },
 
     resolvePermissions: async ({ accountId, userId }) => {
-      const result = await pool.query<MembershipRow>(
-        `SELECT m.role_name, a.owner_user_id
-         FROM memberships m JOIN accounts a ON a.id = m.account_id
-         WHERE m.account_id = $1 AND m.user_id = $2`,
-        [accountId, userId],
-      );
-      const row = result.rows[0];
-      if (row === undefined) return null;
+      return inTenantTransaction(pool, accountId, async (client) => {
+        const result = await client.query<MembershipRow>(
+          `SELECT m.role_name, a.owner_user_id
+           FROM memberships m JOIN accounts a ON a.id = m.account_id
+           WHERE m.account_id = $1 AND m.user_id = $2`,
+          [accountId, userId],
+        );
+        const row = result.rows[0];
+        if (row === undefined) return null;
 
-      // Not a member: no permissions, no owner claim. A member whose role
-      // name resolves to nothing (custom role deleted, or a foreign role
-      // name forced onto the row) gets an empty set — never a guess.
-      const role = await resolveRoleName(pool, accountId, row.role_name);
-      const permissions = role?.toggles ?? [];
-      return { isOwner: row.owner_user_id === userId, roleName: row.role_name, permissions };
+        // Not a member: no permissions, no owner claim. A member whose role
+        // name resolves to nothing (custom role deleted, or a foreign role
+        // name forced onto the row) gets an empty set — never a guess.
+        const role = await resolveRoleName(client, accountId, row.role_name);
+        const permissions = role?.toggles ?? [];
+        return { isOwner: row.owner_user_id === userId, roleName: row.role_name, permissions };
+      });
     },
 
     can: async (accountId, userId, action) => {
-      const resolved = await pool.query<MembershipRow>(
-        `SELECT m.role_name, a.owner_user_id
-         FROM memberships m JOIN accounts a ON a.id = m.account_id
-         WHERE m.account_id = $1 AND m.user_id = $2`,
-        [accountId, userId],
-      );
-      const row = resolved.rows[0];
-      if (row === undefined) {
-        // An owner-only action may still apply: owner is not a membership.
-        if (isOwnerOnlyAction(action)) {
-          const account = await pool.query<OwnerRow>(
-            'SELECT owner_user_id FROM accounts WHERE id = $1',
-            [accountId],
-          );
-          return account.rows[0]?.owner_user_id === userId;
+      return inTenantTransaction(pool, accountId, async (client) => {
+        const resolved = await client.query<MembershipRow>(
+          `SELECT m.role_name, a.owner_user_id
+           FROM memberships m JOIN accounts a ON a.id = m.account_id
+           WHERE m.account_id = $1 AND m.user_id = $2`,
+          [accountId, userId],
+        );
+        const row = resolved.rows[0];
+        if (row === undefined) {
+          // An owner-only action may still apply: owner is not a membership.
+          if (isOwnerOnlyAction(action)) {
+            const account = await client.query<OwnerRow>(
+              'SELECT owner_user_id FROM accounts WHERE id = $1',
+              [accountId],
+            );
+            return account.rows[0]?.owner_user_id === userId;
+          }
+          return false;
         }
-        return false;
-      }
 
-      if (isOwnerOnlyAction(action)) {
-        // Owner-only actions are not toggles: no role grants them, ever.
-        return row.owner_user_id === userId;
-      }
+        if (isOwnerOnlyAction(action)) {
+          // Owner-only actions are not toggles: no role grants them, ever.
+          return row.owner_user_id === userId;
+        }
 
-      const role = await resolveRoleName(pool, accountId, row.role_name);
-      if (role === undefined) return false;
-      return role.toggles.includes(action);
+        const role = await resolveRoleName(client, accountId, row.role_name);
+        if (role === undefined) return false;
+        return role.toggles.includes(action);
+      });
     },
   };
 }
 
-async function ensureUser(pool: Pool, email: string): Promise<UserRef> {
-  const existing = await findUser(pool, email);
-  if (existing !== null) return existing;
-  const id = crypto.randomUUID();
-  await pool.query('INSERT INTO users (id, email) VALUES ($1, $2) ON CONFLICT (email) DO NOTHING', [id, email]);
-  return (await findUser(pool, email)) ?? { userId: id, email };
+async function inTenantTransaction<T>(
+  pool: Pool,
+  accountId: string,
+  operation: (client: PoolClient) => Promise<T>,
+): Promise<T> {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    await client.query("SELECT set_config('app.current_account', $1, true)", [accountId]);
+    const result = await operation(client);
+    await client.query('COMMIT');
+    return result;
+  } catch (error) {
+    await client.query('ROLLBACK').catch(() => undefined);
+    throw error;
+  } finally {
+    client.release();
+  }
 }
 
-async function findUser(pool: Pool, email: string): Promise<UserRef | null> {
-  const result = await pool.query<UserRow>('SELECT id, email FROM users WHERE email = $1', [email]);
+async function ensureUser(client: PoolClient, email: string): Promise<UserRef> {
+  const existing = await findUser(client, email);
+  if (existing !== null) return existing;
+  const id = crypto.randomUUID();
+  await client.query('INSERT INTO users (id, email) VALUES ($1, $2) ON CONFLICT (email) DO NOTHING', [id, email]);
+  return (await findUser(client, email)) ?? { userId: id, email };
+}
+
+async function findUser(client: Pick<PoolClient, 'query'>, email: string): Promise<UserRef | null> {
+  const result = await client.query<UserRow>('SELECT id, email FROM users WHERE email = $1', [email]);
   const row = result.rows[0];
   return row === undefined ? null : { userId: row.id, email: row.email };
 }
@@ -325,8 +370,8 @@ async function userIdByEmail(client: PoolClient, email: string): Promise<string 
  * role is invisible to another by construction — there is no unscoped
  * lookup anywhere.
  */
-async function resolveRoleName(pool: Pool, accountId: string, name: string): Promise<Role | undefined> {
-  const custom = await pool.query<CustomRoleRow>(
+async function resolveRoleName(client: PoolClient, accountId: string, name: string): Promise<Role | undefined> {
+  const custom = await client.query<CustomRoleRow>(
     'SELECT * FROM custom_roles WHERE account_id = $1 AND name = $2',
     [accountId, name],
   );

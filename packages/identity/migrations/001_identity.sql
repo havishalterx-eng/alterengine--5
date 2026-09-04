@@ -72,16 +72,16 @@ ALTER TABLE accounts ENABLE ROW LEVEL SECURITY;
 ALTER TABLE accounts FORCE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS tenant_isolation ON accounts;
 CREATE POLICY tenant_isolation ON accounts
-  USING (id = current_setting('app.current_account', true)::uuid);
+  USING (id = NULLIF(current_setting('app.current_account', true), '')::uuid);
 
 ALTER TABLE memberships ENABLE ROW LEVEL SECURITY;
 ALTER TABLE memberships FORCE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS tenant_isolation ON memberships;
 CREATE POLICY tenant_isolation ON memberships
-  USING (account_id = current_setting('app.current_account', true)::uuid);
+  USING (account_id = NULLIF(current_setting('app.current_account', true), '')::uuid);
 
 ALTER TABLE custom_roles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE custom_roles FORCE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS tenant_isolation ON custom_roles;
 CREATE POLICY tenant_isolation ON custom_roles
-  USING (account_id = current_setting('app.current_account', true)::uuid);
+  USING (account_id = NULLIF(current_setting('app.current_account', true), '')::uuid);

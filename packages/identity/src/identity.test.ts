@@ -3,9 +3,9 @@ import { Client } from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { tenantDataDeclarations } from '@alter/deletion-registry';
 import {
-  createIdentityStore,
+  createIdentityToolingStore,
   UnknownRoleError,
-  type IdentityStore,
+  type IdentityToolingStore,
 } from './store.js';
 
 /**
@@ -23,11 +23,11 @@ import {
  *   5. Every tenant-data table is registered with Deletion & Retention.
  */
 
-let store: IdentityStore;
+let store: IdentityToolingStore;
 let storeReady = false;
 
 beforeAll(async () => {
-  store = createIdentityStore({ databaseUrl: loadConfig(process.env).databaseUrl });
+  store = createIdentityToolingStore({ databaseUrl: loadConfig(process.env).databaseUrl });
   await store.migrate();
   storeReady = true;
 });
